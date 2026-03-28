@@ -1799,8 +1799,8 @@ private double parseSelfDestructTime(ItemStack stack) {
         }
 
         String webhookUsernameHardcoded = "Glazed AH Sniper";
-        String webhookAvatarUrlHardcoded = "https://imgur.com/PHRZBjd";
-        String webhookThumbnailUrlHardcoded = "https://imgur.com/PHRZBjd";
+        String webhookAvatarUrlHardcoded = "https://i.imgur.com/PHRZBjd.png";
+        String webhookThumbnailUrlHardcoded = "https://i.imgur.com/PHRZBjd.png";
 
         String messageContent = String.format("%s💰 **%s** sold **%s** for **%s**!", pingContent, playerName, itemName, this.formatPrice(salePrice));
         String salePriceStr = this.formatPrice(salePrice);

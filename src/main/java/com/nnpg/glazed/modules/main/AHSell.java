@@ -341,8 +341,8 @@ public class AHSell extends Module {
         }
 
         String webhookUsernameHardcoded = "Glazed AH Seller";
-        String webhookAvatarUrlHardcoded = "https://i.imgur.com/OL2y1cr.png";
-        String webhookThumbnailUrlHardcoded = "https://i.imgur.com/OL2y1cr.png";
+        String webhookAvatarUrlHardcoded = "https://i.imgur.com/PHRZBjd.png";
+        String webhookThumbnailUrlHardcoded = "https://i.imgur.com/PHRZBjd.png";
 
         String messageContent = String.format("%s💰 **%s** sold **%s** for **%s**!", pingContent, playerName, itemName, formatPrice(salePrice));
         String salePriceStr = formatPrice(salePrice);
