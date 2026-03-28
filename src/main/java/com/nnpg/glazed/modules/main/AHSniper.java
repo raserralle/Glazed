@@ -153,6 +153,7 @@ public class AHSniper extends Module {
     private double lastSoldPrice;
     private double totalSpent;
     private double totalSold;
+    private int itemsOnSale;
     private final HttpClient httpClient;
 
     public AHSniper() {
@@ -676,6 +677,7 @@ public class AHSniper extends Module {
         this.lastSoldPrice = 0;
         this.totalSpent = 0;
         this.totalSold = 0;
+        this.itemsOnSale = 0;
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10L)).build();
     }
 
@@ -818,6 +820,7 @@ public class AHSniper extends Module {
             this.info("Total Spent: %s", this.formatPrice(this.totalSpent));
             this.info("Total Sold: %s", this.formatPrice(this.totalSold));
             this.info("Total Profit: %s", this.formatPrice(profit));
+            this.info("Items Still On Sale: %d", this.itemsOnSale);
         }
     }
 
@@ -973,6 +976,11 @@ public class AHSniper extends Module {
                 
                 // Track sold amount
                 this.totalSold += this.lastSoldPrice;
+                
+                // Decrement items on sale counter
+                if (this.itemsOnSale > 0) {
+                    this.itemsOnSale--;
+                }
                 
                 // Send webhook notification (uses same webhook URL as snipe success)
                 if (this.webhookEnabled.get()) {
@@ -1529,6 +1537,7 @@ private double parseSelfDestructTime(ItemStack stack) {
         
         // Execute the sell command
         this.mc.getNetworkHandler().sendChatCommand(String.format("ah sell %d", (int) price));
+        this.itemsOnSale++;
         this.sellingPhase = false;
         this.navigationDelayCounter = 5;
         this.lastActionTicks = 0;
@@ -2045,11 +2054,12 @@ private double parseSelfDestructTime(ItemStack stack) {
         double totalProfit = this.totalSold - this.totalSpent;
         String totalProfitStr = this.formatPrice(Math.abs(totalProfit));
         String profitStatus = totalProfit >= 0 ? "✅ Profit" : "❌ Loss";
+        String itemsOnSaleStr = String.valueOf(this.itemsOnSale);
 
-        return String.format("{\"content\":\"%s\",\"username\":\"%s\",\"avatar_url\":\"%s\",\"embeds\":[{\"title\":\"Glazed AH Sniper AutoSell Alert\",\"description\":\"Item sold through auto-sell. Session profit tracking enabled!\",\"color\":65280,\"thumbnail\":{\"url\":\"%s\"},\"fields\":[{\"name\":\"📦 Item\",\"value\":\"%s\",\"inline\":true},{\"name\":\"💵 Sale Price\",\"value\":\"%s\",\"inline\":true},{\"name\":\"⏰ Timestamp\",\"value\":\"<t:%d:R>\",\"inline\":true},{\"name\":\"💸 Total Spent\",\"value\":\"%s\",\"inline\":true},{\"name\":\"💰 Total Sold\",\"value\":\"%s\",\"inline\":true},{\"name\":\"%s Total\",\"value\":\"%s\",\"inline\":true}],\"footer\":{\"text\":\"Glazed AH Sniper V2\"},\"timestamp\":\"%s\"}]}",
+        return String.format("{\"content\":\"%s\",\"username\":\"%s\",\"avatar_url\":\"%s\",\"embeds\":[{\"title\":\"Glazed AH Sniper AutoSell Alert\",\"description\":\"Item sold through auto-sell. Session profit tracking enabled!\",\"color\":65280,\"thumbnail\":{\"url\":\"%s\"},\"fields\":[{\"name\":\"📦 Item\",\"value\":\"%s\",\"inline\":true},{\"name\":\"💵 Sale Price\",\"value\":\"%s\",\"inline\":true},{\"name\":\"⏰ Timestamp\",\"value\":\"<t:%d:R>\",\"inline\":true},{\"name\":\"💸 Total Spent\",\"value\":\"%s\",\"inline\":true},{\"name\":\"💰 Total Sold\",\"value\":\"%s\",\"inline\":true},{\"name\":\"%s Total\",\"value\":\"%s\",\"inline\":true},{\"name\":\"📊 Items On Sale\",\"value\":\"%s\",\"inline\":false}],\"footer\":{\"text\":\"Glazed AH Sniper V2\"},\"timestamp\":\"%s\"}]}",
             this.escapeJson(messageContent), this.escapeJson(webhookUsernameHardcoded), this.escapeJson(webhookAvatarUrlHardcoded),
             this.escapeJson(webhookThumbnailUrlHardcoded), this.escapeJson(itemName), this.escapeJson(salePriceStr), timestamp,
-            this.escapeJson(totalSpentStr), this.escapeJson(totalSoldStr), profitStatus, this.escapeJson(totalProfitStr), Instant.now().toString());
+            this.escapeJson(totalSpentStr), this.escapeJson(totalSoldStr), profitStatus, this.escapeJson(totalProfitStr), itemsOnSaleStr, Instant.now().toString());
     }
 
     private void testWebhook() {
