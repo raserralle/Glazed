@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import meteordevelopment.meteorclient.events.world.TickEvent;
+import meteordevelopment.meteorclient.events.game.ReceiveMessageEvent;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Modules;
@@ -130,6 +131,8 @@ public class AHSniper extends Module {
     private final int SELL_DELAY_TICKS;
     private int lastActionTicks;
     private final int MAX_STAGNANT_TICKS;
+    private String lastSoldItemName;
+    private double lastSoldPrice;
     private final HttpClient httpClient;
 
     public AHSniper() {
@@ -521,6 +524,8 @@ public class AHSniper extends Module {
         this.SELL_DELAY_TICKS = 2;
         this.lastActionTicks = 0;
         this.MAX_STAGNANT_TICKS = 2200;
+        this.lastSoldItemName = "";
+        this.lastSoldPrice = 0;
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10L)).build();
     }
 
@@ -755,6 +760,33 @@ public class AHSniper extends Module {
         }
     }
 
+    @EventHandler
+    private void onChatMessage(ReceiveMessageEvent event) {
+        String msg = event.getMessage().getString();
+
+        // Detect sale message: "PlayerName bought your ItemName for $Price"
+        if (msg.contains("bought your") && this.sellingPhase) {
+            // Extract item name and price from the message
+            // Format: "PlayerName bought your ItemName for $Price"
+            Pattern pattern = Pattern.compile("bought your (.+?) for \\$([\\.\\d]+[KMB]?)");
+            Matcher matcher = pattern.matcher(msg);
+            
+            if (matcher.find()) {
+                this.lastSoldItemName = matcher.group(1);
+                String priceStr = matcher.group(2);
+                this.lastSoldPrice = this.parsePrice(priceStr);
+                
+                // Send webhook notification
+                if (this.webhookEnabled.get()) {
+                    this.sendAutoSellWebhook(this.lastSoldItemName, this.lastSoldPrice);
+                }
+                if (this.notifications.get()) {
+                    this.info("Item sold! %s for %s", this.lastSoldItemName, this.formatPrice(this.lastSoldPrice));
+                }
+            }
+        }
+    }
+
     private void processMainPageTopLeftOnly(GenericContainerScreenHandler handler) {
         ItemStack sortBtn = handler.getSlot(47).getStack();
         if (!sortBtn.isEmpty() && sortBtn.getName().getString().contains("Recently Listed")) {
@@ -842,6 +874,9 @@ public class AHSniper extends Module {
                                 this.attemptedActualPrice = currentItemPrice;
                                 this.attemptedQuantity = stack.getCount();
                                 this.attemptedEnchantments = this.getEnchantmentsString(stack);
+                                double destructionHours = this.parseSelfDestructTime(stack);
+                                this.attemptedDestructionHours = destructionHours;
+                                this.attemptedDestructionTimer = this.formatDestructionTimer(destructionHours);
                                 this.mc.interactionManager.clickSlot(handler.syncId, i, 1, SlotActionType.QUICK_MOVE, this.mc.player);
                                 this.isProcessing = false;
                                 this.hasClickedBuy = true;
@@ -966,11 +1001,25 @@ public class AHSniper extends Module {
         }
         if (this.hasClickedConfirm) return;
 
-        // Re-validate timer before confirming (prevents buying items whose timer dropped due to lag)
-        if (this.filterLowTime.get() && this.attemptedDestructionHours > 0) {
-            if (this.attemptedDestructionHours < this.minTimeHours.get()) {
+        // Verify the item's destruction timer from the confirmation screen
+        if (this.filterLowTime.get()) {
+            double confirmationTimer = this.readDestructionTimerFromScreen(handler);
+            
+            if (confirmationTimer == -1.0) {
+                // No item found in confirmation slot - cancel purchase
                 if (this.notifications.get()) {
-                    this.info("CANCELLED: Item timer dropped below minimum (%.1f < %.1f hours)", this.attemptedDestructionHours, this.minTimeHours.get());
+                    this.info("CANCELLED: Could not find item in confirmation GUI");
+                }
+                this.purchaseAttempted = false;
+                this.hasClickedBuy = false;
+                this.waitingForConfirmation = false;
+                return;
+            }
+            
+            if (confirmationTimer < this.minTimeHours.get()) {
+                // Timer is below minimum requirement - cancel purchase
+                if (this.notifications.get()) {
+                    this.info("CANCELLED: Item timer is %.1f hours, below minimum %.1f hours", confirmationTimer, this.minTimeHours.get());
                 }
                 this.purchaseAttempted = false;
                 this.hasClickedBuy = false;
@@ -991,6 +1040,21 @@ public class AHSniper extends Module {
                 this.info("Purchase confirmed!");
             }
         }
+    }
+
+    private double readDestructionTimerFromScreen(GenericContainerScreenHandler handler) {
+        // Check slot 13 where the item to purchase is always displayed
+        if (handler.slots.size() > 13) {
+            ItemStack stack = handler.getSlot(13).getStack();
+            if (!stack.isEmpty()) {
+                double timerValue = this.parseSelfDestructTime(stack);
+                if (this.debugMode.get()) {
+                    this.info("Debug: Item at slot 13 has destruction timer: %.1f hours", timerValue);
+                }
+                return timerValue;
+            }
+        }
+        return -1.0;  // No item found at confirmation slot
     }
 
     private boolean clickConfirmButton(GenericContainerScreenHandler handler) {
@@ -1686,8 +1750,8 @@ private double parseSelfDestructTime(ItemStack stack) {
         String savingsPercentage = String.format("%.1f%%", savings / maxPriceValue * 100.0);
 
         String webhookUsernameHardcoded = "Glazed AH Sniper";
-        String webhookAvatarUrlHardcoded = "https://imgur.com/PHRZBjd";
-        String webhookThumbnailUrlHardcoded = "https://imgur.com/PHRZBjd";
+        String webhookAvatarUrlHardcoded = "https://i.imgur.com/PHRZBjd.png";
+        String webhookThumbnailUrlHardcoded = "https://i.imgur.com/PHRZBjd.png";
 
         String messageContent = String.format("%s\ud83c\udfaf **%s** sniped **%dx %s** for **%s**!", pingContent, playerName, quantity, itemName, actualPriceStr);
         String description = String.format("\ud83d\udcb8 **Savings** of %s (**%s**)", savingsStr, savingsPercentage);
@@ -1707,6 +1771,43 @@ private double parseSelfDestructTime(ItemStack stack) {
             this.escapeJson(itemName), quantity, this.escapeJson(actualPriceStr),
             this.escapeJson(maxPriceStr), this.escapeJson(priceModeStr.toLowerCase()),
             this.escapeJson(enchantValue), this.escapeJson(destructionTimer), timestamp, Instant.now().toString());
+    }
+
+    private void sendAutoSellWebhook(String itemName, double salePrice) {
+        if (!this.webhookEnabled.get() || this.webhookUrl.get().isEmpty()) {
+            if (this.debugMode.get()) {
+                this.info("Debug: Auto-sell webhook not sent - Enabled: %s, URL set: %s", this.webhookEnabled.get(), !this.webhookUrl.get().isEmpty());
+            }
+            return;
+        }
+
+        if (this.debugMode.get()) {
+            this.info("Debug: Sending auto-sell webhook for %s at %s", itemName, this.formatPrice(salePrice));
+        }
+
+        String jsonPayload = this.createAutoSellEmbed(itemName, salePrice);
+        this.sendWebhookMessage(jsonPayload, "AutoSell");
+    }
+
+    private String createAutoSellEmbed(String itemName, double salePrice) {
+        String playerName = this.mc.player != null ? this.mc.player.getName().getString() : "Unknown";
+        long timestamp = System.currentTimeMillis() / 1000L;
+
+        String pingContent = "";
+        if (this.selfPing.get() && !this.discordId.get().trim().isEmpty()) {
+            pingContent = String.format("<@%s> ", this.discordId.get().trim());
+        }
+
+        String webhookUsernameHardcoded = "Glazed AH Sniper";
+        String webhookAvatarUrlHardcoded = "https://imgur.com/PHRZBjd";
+        String webhookThumbnailUrlHardcoded = "https://imgur.com/PHRZBjd";
+
+        String messageContent = String.format("%s💰 **%s** sold **%s** for **%s**!", pingContent, playerName, itemName, this.formatPrice(salePrice));
+        String salePriceStr = this.formatPrice(salePrice);
+
+        return String.format("{\"content\":\"%s\",\"username\":\"%s\",\"avatar_url\":\"%s\",\"embeds\":[{\"title\":\"Glazed AH Sniper AutoSell Alert\",\"description\":\"Item sold through auto-sell.\",\"color\":65280,\"thumbnail\":{\"url\":\"%s\"},\"fields\":[{\"name\":\"📦 Item\",\"value\":\"%s\",\"inline\":true},{\"name\":\"💵 Sale Price\",\"value\":\"%s\",\"inline\":true},{\"name\":\"⏰ Timestamp\",\"value\":\"<t:%d:R>\",\"inline\":true}],\"footer\":{\"text\":\"Glazed AH Sniper V2\"},\"timestamp\":\"%s\"}]}",
+            this.escapeJson(messageContent), this.escapeJson(webhookUsernameHardcoded), this.escapeJson(webhookAvatarUrlHardcoded),
+            this.escapeJson(webhookThumbnailUrlHardcoded), this.escapeJson(itemName), this.escapeJson(salePriceStr), timestamp, Instant.now().toString());
     }
 
     private void testWebhook() {
