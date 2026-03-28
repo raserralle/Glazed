@@ -1686,8 +1686,8 @@ private double parseSelfDestructTime(ItemStack stack) {
         String savingsPercentage = String.format("%.1f%%", savings / maxPriceValue * 100.0);
 
         String webhookUsernameHardcoded = "Glazed AH Sniper";
-        String webhookAvatarUrlHardcoded = "https://i.imgur.com/OL2y1cr.png";
-        String webhookThumbnailUrlHardcoded = "https://i.imgur.com/OL2y1cr.png";
+        String webhookAvatarUrlHardcoded = "https://imgur.com/PHRZBjd";
+        String webhookThumbnailUrlHardcoded = "https://imgur.com/PHRZBjd";
 
         String messageContent = String.format("%s\ud83c\udfaf **%s** sniped **%dx %s** for **%s**!", pingContent, playerName, quantity, itemName, actualPriceStr);
         String description = String.format("\ud83d\udcb8 **Savings** of %s (**%s**)", savingsStr, savingsPercentage);
