@@ -1,7 +1,10 @@
 package com.nnpg.glazed.modules.main;
 
 import com.nnpg.glazed.GlazedAddon;
+import com.nnpg.glazed.gui.AHSniperStatsScreen;
 import com.nnpg.glazed.utils.Statistics;
+import com.nnpg.glazed.utils.DetailedStats;
+import meteordevelopment.meteorclient.gui.GuiThemes;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -41,6 +44,7 @@ public class AHSniper extends Module {
     private final SettingGroup sgAutoSell;
     private final SettingGroup sgTimerConditions;
     private final SettingGroup sgUserFilter;
+    private final SettingGroup sgStatistics;
     private final Setting<SnipeMode> snipeMode;
     private final Setting<Item> snipingItem;
     private final Setting<String> targetItemName;
@@ -166,6 +170,7 @@ public class AHSniper extends Module {
         this.sgTimerConditions = this.settings.createGroup("Destruction Timer Conditions");
         this.sgWebhook = this.settings.createGroup("Discord Webhook");
         this.sgUserFilter = this.settings.createGroup("User Filter");
+        this.sgStatistics = this.settings.createGroup("Statistics");
 
         this.snipeMode = this.sgGeneral.add(new EnumSetting.Builder<SnipeMode>()
             .name("snipe-mode")
@@ -638,6 +643,17 @@ public class AHSniper extends Module {
             .defaultValue(true)
             .build());
 
+        this.sgStatistics.add(new BoolSetting.Builder()
+            .name("open-stats")
+            .description("Toggle to open detailed statistics screen")
+            .defaultValue(false)
+            .onChanged(s -> {
+                if (s) {
+                    this.openStatsScreen();
+                }
+            })
+            .build());
+
         this.waitingForConfirmation = false;
         this.itemPickedUp = false;
         this.purchaseAttempted = false;
@@ -816,6 +832,15 @@ public class AHSniper extends Module {
         this.multiSnipeConfigs.clear();
         this.timerConditions.clear();
         
+        // Track session time and unsold items
+        long sessionDuration = System.currentTimeMillis() - this.sessionStartTime;
+        if (sessionDuration > 0) {
+            this.stats.addSessionTime(sessionDuration);
+        }
+        if (this.itemsOnSale > 0) {
+            this.stats.addUnsoldsItems(this.itemsOnSale);
+        }
+        
         // Show final profit summary on deactivate
         if ((this.stats.allTimeSold > 0 || this.stats.allTimeSpent > 0) && this.notifications.get()) {
             double sessionProfit = this.stats.getDailyProfit();
@@ -902,6 +927,8 @@ public class AHSniper extends Module {
                 if (this.debugMode.get()) {
                     this.info("Debug: Purchase timeout reached, resetting state");
                 }
+                // Track failed purchase attempt
+                this.stats.recordAttemptedPurchase();
                 this.purchaseAttempted = false;
                 this.purchaseTimeoutTicks = 0;
                 this.inventoryCheckTicks = 0;
@@ -982,6 +1009,7 @@ public class AHSniper extends Module {
                 
                 // Track sold amount
                 this.stats.incrementSold(this.lastSoldPrice);
+                this.stats.recordSale(this.lastSoldPrice, 1);
                 
                 // Decrement items on sale counter
                 if (this.itemsOnSale > 0) {
@@ -1554,6 +1582,7 @@ private double parseSelfDestructTime(ItemStack stack) {
         // Execute the sell command
         this.mc.getNetworkHandler().sendChatCommand(String.format("ah sell %d", (int) price));
         this.itemsOnSale++;
+        this.stats.updatePeakItemsOnSale(this.itemsOnSale);
         this.sellingPhase = false;
         this.navigationDelayCounter = 5;
         this.lastActionTicks = 0;
@@ -1865,6 +1894,7 @@ private double parseSelfDestructTime(ItemStack stack) {
                 
                 // Track spent amount
                 this.stats.incrementSpent(this.attemptedActualPrice);
+                this.stats.recordPurchase(this.attemptedActualPrice, this.attemptedQuantity);
 
                 if (this.mc.player != null && this.mc.world != null) {
                     this.mc.world.playSound(this.mc.player, this.mc.player.getBlockPos(), SoundEvents.ENTITY_PLAYER_LEVELUP, SoundCategory.PLAYERS, 1.0F, 1.0F);
@@ -2097,6 +2127,80 @@ private double parseSelfDestructTime(ItemStack stack) {
         this.sendWebhookMessage(testPayload, "Test");
     }
 
+    /**
+     * Send a comprehensive detailed statistics webhook.
+     */
+    public void sendDetailedStatsWebhook() {
+        if (!this.webhookEnabled.get() || this.webhookUrl.get().isEmpty()) {
+            return;
+        }
+        long sessionDuration = System.currentTimeMillis() - this.sessionStartTime;
+        DetailedStats detailedStats = this.stats.getDetailedStats(this.itemsOnSale, sessionDuration);
+        String jsonPayload = this.createDetailedStatsEmbed(detailedStats);
+        this.sendWebhookMessage(jsonPayload, "Detailed Stats");
+    }
+
+    /**
+     * Create a comprehensive detailed stats webhook embed.
+     */
+    private String createDetailedStatsEmbed(DetailedStats stats) {
+        String playerName = this.mc.player != null ? this.mc.player.getName().getString() : "Unknown";
+        long timestamp = System.currentTimeMillis() / 1000L;
+
+        String pingContent = "";
+        if (this.selfPing.get() && !this.discordId.get().trim().isEmpty()) {
+            pingContent = String.format("<@%s> ", this.discordId.get().trim());
+        }
+
+        String webhookUsernameHardcoded = "Glazed AH Sniper";
+        String webhookAvatarUrlHardcoded = "https://i.imgur.com/PHRZBjd.png";
+        String webhookThumbnailUrlHardcoded = "https://i.imgur.com/PHRZBjd.png";
+
+        String messageContent = String.format("%s📊 **%s** - Detailed Statistics Report", pingContent, playerName);
+
+        // Format all stats values
+        String purchaseStats = String.format("Items: **%d** | Spent: **%s** | Avg: **%s**", 
+            stats.totalItemsPurchased, this.formatPrice(stats.totalSpent), this.formatPrice(stats.avgPurchasePrice));
+        
+        String salesStats = String.format("Items: **%d** | Sold: **%s** | Avg: **%s**",
+            stats.totalItemsSold, this.formatPrice(stats.totalSold), this.formatPrice(stats.avgSalePrice));
+        
+        String profitStatus = stats.allTimeProfit >= 0 ? "✅" : "❌";
+        String profitStats = String.format("%s All-Time: **%s** (%.1f%%) | Daily: **%s** (%.1f%%)",
+            profitStatus, this.formatPrice(stats.allTimeProfit), stats.profitMarginPercent,
+            this.formatPrice(stats.dailyProfit), stats.dailyProfitMarginPercent);
+        
+        String performanceStats = String.format("Items/hr: **%.2f** | Hourly Rate: **%s/hr** | Purchase Success: **%.1f%%** | Sale Success: **%.1f%%**",
+            stats.itemsPerHour, this.formatPrice(stats.hourlyRate), stats.purchaseSuccessRate, stats.saleSuccessRate);
+        
+        String inventoryStats = String.format("Current: **%d** | Peak: **%d** | Never Sold: **%d**",
+            stats.currentItemsOnSale, stats.peakItemsOnSale, stats.listedButUnsold);
+        
+        // Predictive stats
+        String trendStats = String.format("Profit Accel: **%.2f**/hr | Success Trend: **%.1f%%** | Volatility: **%s**",
+            stats.profitAcceleration, stats.successRateTrend, this.formatPrice(stats.priceVolatility));
+        
+        String projectionStats = String.format("Projected Daily: **%s** | Inventory Clear: **%.1fh** | Avg Flip Time: **%.0f**s",
+            this.formatPrice(stats.projectedDailyProfit), stats.inventoryTurnoverHours, stats.avgTimeToSellMs / 1000.0);
+        
+        String patternStats = String.format("Peak Hour: **%s** | Best Snipe: **%s** | Floor: **%s** | Ceiling: **%s**",
+            stats.peakEarningHour >= 0 ? stats.peakEarningHour + ":00" : "N/A",
+            stats.bestSnipeHour >= 0 ? stats.bestSnipeHour + ":00" : "N/A",
+            this.formatPrice(stats.priceFloorEstimate), this.formatPrice(stats.priceCeilingEstimate));
+        
+        String efficiencyStats = String.format("Capital Efficiency: **%.2f** | Velocity: **%.2f** | Consistency: **%.1f%%**",
+            stats.capitalEfficiency, stats.capitalVelocity, stats.consistencyScore);
+
+        return String.format("{\"content\":\"%s\",\"username\":\"%s\",\"avatar_url\":\"%s\",\"embeds\":[{\"title\":\"Glazed AH Sniper - Comprehensive Statistics\",\"description\":\"Detailed metrics across all-time, daily, and session views\",\"color\":4437377,\"thumbnail\":{\"url\":\"%s\"},\"fields\":[{\"name\":\"💳 Purchase Statistics\",\"value\":\"%s\",\"inline\":false},{\"name\":\"💰 Sales Statistics\",\"value\":\"%s\",\"inline\":false},{\"name\":\"📈 Profit Metrics\",\"value\":\"%s\",\"inline\":false},{\"name\":\"⚡ Performance Metrics\",\"value\":\"%s\",\"inline\":false},{\"name\":\"📦 Inventory Status\",\"value\":\"%s\",\"inline\":false},{\"name\":\"📊 Trend Analysis\",\"value\":\"%s\",\"inline\":false},{\"name\":\"🔮 Projections\",\"value\":\"%s\",\"inline\":false},{\"name\":\"🎯 Patterns & Pricing\",\"value\":\"%s\",\"inline\":false},{\"name\":\"⚙️ Efficiency Metrics\",\"value\":\"%s\",\"inline\":false},{\"name\":\"📊 Report Time\",\"value\":\"<t:%d:R>\",\"inline\":true},{\"name\":\"📅 Total Sessions\",\"value\":\"%d\",\"inline\":true}],\"footer\":{\"text\":\"Glazed AH Sniper V2 - Detailed Stats with Predictions\"},\"timestamp\":\"%s\"}]}",
+            this.escapeJson(messageContent), this.escapeJson(webhookUsernameHardcoded), this.escapeJson(webhookAvatarUrlHardcoded),
+            this.escapeJson(webhookThumbnailUrlHardcoded),
+            this.escapeJson(purchaseStats), this.escapeJson(salesStats), this.escapeJson(profitStats),
+            this.escapeJson(performanceStats), this.escapeJson(inventoryStats),
+            this.escapeJson(trendStats), this.escapeJson(projectionStats), this.escapeJson(patternStats),
+            this.escapeJson(efficiencyStats),
+            timestamp, stats.totalSessions, Instant.now().toString());
+    }
+
     private String createSimpleTestMessage() {
         String playerName = this.mc.player != null ? this.mc.player.getName().getString() : "Unknown";
         String webhookUsernameHardcoded = "Glazed AH Sniper";
@@ -2208,6 +2312,36 @@ private double parseTooltipPrice(List<Text> tooltip) {
         String[] parts = translationKey.split("\\.");
         String itemName = parts[parts.length - 1];
         return itemName.replace("_", " ").toLowerCase();
+    }
+
+    /**
+     * Get the statistics object.
+     */
+    public Statistics getStats() {
+        return this.stats;
+    }
+
+    /**
+     * Get the session start time in milliseconds.
+     */
+    public long getSessionStartTime() {
+        return this.sessionStartTime;
+    }
+
+    /**
+     * Get the current number of items on sale.
+     */
+    public int getItemsOnSale() {
+        return this.itemsOnSale;
+    }
+
+    /**
+     * Open the statistics GUI screen.
+     */
+    public void openStatsScreen() {
+        if (this.mc != null && GuiThemes.get() != null) {
+            this.mc.setScreen(new AHSniperStatsScreen(GuiThemes.get(), this));
+        }
     }
 
     public enum SnipeMode {
