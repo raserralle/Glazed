@@ -1222,9 +1222,7 @@ public class AHSniper extends Module {
                 if (this.notifications.get()) {
                     this.info("CANCELLED: Could not find item in confirmation GUI");
                 }
-                this.purchaseAttempted = false;
-                this.hasClickedBuy = false;
-                this.waitingForConfirmation = false;
+                this.cancelPurchaseAndRescan();
                 return;
             }
             
@@ -1233,9 +1231,7 @@ public class AHSniper extends Module {
                 if (this.notifications.get()) {
                     this.info("CANCELLED: Item timer is %.1f hours, below minimum %.1f hours", confirmationTimer, this.minTimeHours.get());
                 }
-                this.purchaseAttempted = false;
-                this.hasClickedBuy = false;
-                this.waitingForConfirmation = false;
+                this.cancelPurchaseAndRescan();
                 return;
             }
         }
@@ -1267,6 +1263,20 @@ public class AHSniper extends Module {
             }
         }
         return -1.0;  // No item found at confirmation slot
+    }
+
+    private void cancelPurchaseAndRescan() {
+        // Close confirmation screen
+        if (this.mc.currentScreen != null) {
+            this.mc.player.closeHandledScreen();
+        }
+        
+        // Use the existing comprehensive reset
+        this.resetState();
+        
+        // Force a fresh AH search from the beginning
+        this.openAuctionHouse();
+        this.commandSent = true;
     }
 
     private boolean clickConfirmButton(GenericContainerScreenHandler handler) {
