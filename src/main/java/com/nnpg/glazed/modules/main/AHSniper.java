@@ -946,7 +946,8 @@ public class AHSniper extends Module {
         String msg = event.getMessage().getString();
 
         // Detect sale message: "PlayerName bought your ItemName for $Price"
-        if (msg.contains("bought your") && this.sellingPhase) {
+        // This can happen anytime, while we're sniping or doing anything else
+        if (msg.contains("bought your")) {
             // Extract item name and price from the message
             // Format: "PlayerName bought your ItemName for $Price"
             Pattern pattern = Pattern.compile("bought your (.+?) for \\$([\\.\\d]+[KMB]?)");
@@ -957,7 +958,7 @@ public class AHSniper extends Module {
                 String priceStr = matcher.group(2);
                 this.lastSoldPrice = this.parsePrice(priceStr);
                 
-                // Send webhook notification
+                // Send webhook notification (uses same webhook URL as snipe success)
                 if (this.webhookEnabled.get()) {
                     this.sendAutoSellWebhook(this.lastSoldItemName, this.lastSoldPrice);
                 }
