@@ -2339,7 +2339,7 @@ private double parseTooltipPrice(List<Text> tooltip) {
      * Open the statistics GUI screen.
      */
     public void openStatsScreen() {
-        if (this.mc != null) {
+        if (this.mc != null && GuiThemes.get() != null) {
             this.mc.setScreen(new AHSniperStatsScreen(GuiThemes.get(), this));
         }
     }
