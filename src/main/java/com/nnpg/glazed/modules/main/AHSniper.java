@@ -1001,8 +1001,8 @@ public class AHSniper extends Module {
         }
         if (this.hasClickedConfirm) return;
 
-        // Only verify destruction timer during purchase confirmation, not during auto-sell
-        if (!this.sellingPhase && this.filterLowTime.get()) {
+        // Only verify destruction timer during purchase, not during auto-sell (which happens after item is picked up)
+        if (this.filterLowTime.get() && !this.itemPickedUp && handler.slots.size() > 13) {
             double confirmationTimer = this.readDestructionTimerFromScreen(handler);
             
             if (confirmationTimer == -1.0) {
