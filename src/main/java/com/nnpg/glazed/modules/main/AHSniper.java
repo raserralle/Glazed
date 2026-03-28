@@ -2015,13 +2015,14 @@ private double parseSelfDestructTime(ItemStack stack) {
         }
 
         String modeText = this.snipeMode.get() == SnipeMode.MULTI ? "Multi-Snipe" : "Single-Snipe";
+        String itemsOnSaleStr = String.valueOf(this.itemsOnSale);
 
-        return String.format("{\"content\":\"%s\",\"username\":\"%s\",\"avatar_url\":\"%s\",\"embeds\":[{\"title\":\"Glazed AH Sniper Alert [%s]\",\"description\":\"%s\",\"color\":8388736,\"thumbnail\":{\"url\":\"%s\"},\"fields\":[{\"name\":\"\ud83d\udce6 Item\",\"value\":\"%s x%d\",\"inline\":true},{\"name\":\"\ud83d\udcb0 Purchase Price\",\"value\":\"%s\",\"inline\":true},{\"name\":\"\ud83d\udcb5 Max Price\",\"value\":\"%s (%s)\",\"inline\":true},{\"name\":\"\u2728 Enchantments\",\"value\":\"%s\",\"inline\":false},{\"name\":\"\u23f0 Destruction Timer\",\"value\":\"%s\",\"inline\":true},{\"name\":\"\u231a Timestamp\",\"value\":\"<t:%d:R>\",\"inline\":true}],\"footer\":{\"text\":\"Glazed AH Sniper V2\"},\"timestamp\":\"%s\"}]}",
+        return String.format("{\"content\":\"%s\",\"username\":\"%s\",\"avatar_url\":\"%s\",\"embeds\":[{\"title\":\"Glazed AH Sniper Alert [%s]\",\"description\":\"%s\",\"color\":8388736,\"thumbnail\":{\"url\":\"%s\"},\"fields\":[{\"name\":\"\ud83d\udce6 Item\",\"value\":\"%s x%d\",\"inline\":true},{\"name\":\"\ud83d\udcb0 Purchase Price\",\"value\":\"%s\",\"inline\":true},{\"name\":\"\ud83d\udcb5 Max Price\",\"value\":\"%s (%s)\",\"inline\":true},{\"name\":\"\u2728 Enchantments\",\"value\":\"%s\",\"inline\":false},{\"name\":\"\u23f0 Destruction Timer\",\"value\":\"%s\",\"inline\":true},{\"name\":\"\u231a Timestamp\",\"value\":\"<t:%d:R>\",\"inline\":true},{\"name\":\"📊 Items On Sale\",\"value\":\"%s\",\"inline\":true}],\"footer\":{\"text\":\"Glazed AH Sniper V2\"},\"timestamp\":\"%s\"}]}",
             this.escapeJson(messageContent), this.escapeJson(webhookUsernameHardcoded), this.escapeJson(webhookAvatarUrlHardcoded),
             modeText, this.escapeJson(description), this.escapeJson(webhookThumbnailUrlHardcoded),
             this.escapeJson(itemName), quantity, this.escapeJson(actualPriceStr),
             this.escapeJson(maxPriceStr), this.escapeJson(priceModeStr.toLowerCase()),
-            this.escapeJson(enchantValue), this.escapeJson(destructionTimer), timestamp, Instant.now().toString());
+            this.escapeJson(enchantValue), this.escapeJson(destructionTimer), timestamp, itemsOnSaleStr, Instant.now().toString());
     }
 
     private void sendAutoSellWebhook(String itemName, double salePrice) {
