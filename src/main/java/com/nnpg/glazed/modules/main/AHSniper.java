@@ -643,6 +643,17 @@ public class AHSniper extends Module {
             .defaultValue(true)
             .build());
 
+        this.sgStatistics.add(new BoolSetting.Builder()
+            .name("open-stats")
+            .description("Toggle to open detailed statistics screen")
+            .defaultValue(false)
+            .onChanged(s -> {
+                if (s) {
+                    this.openStatsScreen();
+                }
+            })
+            .build());
+
         this.waitingForConfirmation = false;
         this.itemPickedUp = false;
         this.purchaseAttempted = false;
@@ -982,13 +993,6 @@ public class AHSniper extends Module {
     @EventHandler
     private void onChatMessage(ReceiveMessageEvent event) {
         String msg = event.getMessage().getString();
-
-        // Check for stats command
-        if (msg.startsWith(".ahstats") || msg.startsWith("/ahstats")) {
-            event.cancel();
-            this.openStatsScreen();
-            return;
-        }
 
         // Detect sale message: "PlayerName bought your ItemName for $Price"
         // This can happen anytime, while we're sniping or doing anything else
