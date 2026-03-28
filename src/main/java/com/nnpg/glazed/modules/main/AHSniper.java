@@ -151,6 +151,8 @@ public class AHSniper extends Module {
     private final int MAX_STAGNANT_TICKS;
     private String lastSoldItemName;
     private double lastSoldPrice;
+    private double totalSpent;
+    private double totalSold;
     private final HttpClient httpClient;
 
     public AHSniper() {
@@ -672,6 +674,8 @@ public class AHSniper extends Module {
         this.MAX_STAGNANT_TICKS = 2200;
         this.lastSoldItemName = "";
         this.lastSoldPrice = 0;
+        this.totalSpent = 0;
+        this.totalSold = 0;
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10L)).build();
     }
 
@@ -806,6 +810,15 @@ public class AHSniper extends Module {
         this.resetState();
         this.multiSnipeConfigs.clear();
         this.timerConditions.clear();
+        
+        // Show final profit summary on deactivate
+        if ((this.totalSpent > 0 || this.totalSold > 0) && this.notifications.get()) {
+            double profit = this.totalSold - this.totalSpent;
+            this.info("===== Session Summary =====");
+            this.info("Total Spent: %s", this.formatPrice(this.totalSpent));
+            this.info("Total Sold: %s", this.formatPrice(this.totalSold));
+            this.info("Total Profit: %s", this.formatPrice(profit));
+        }
     }
 
     private void resetState() {
@@ -957,6 +970,9 @@ public class AHSniper extends Module {
                 this.lastSoldItemName = matcher.group(1);
                 String priceStr = matcher.group(2);
                 this.lastSoldPrice = this.parsePrice(priceStr);
+                
+                // Track sold amount
+                this.totalSold += this.lastSoldPrice;
                 
                 // Send webhook notification (uses same webhook URL as snipe success)
                 if (this.webhookEnabled.get()) {
@@ -1821,6 +1837,9 @@ private double parseSelfDestructTime(ItemStack stack) {
                     this.info("Purchase successful! Got %dx %s for %s", this.attemptedQuantity, this.attemptedItemName, this.formatPrice(this.attemptedActualPrice));
                 }
                 this.sendSuccessWebhook(this.attemptedItemName, this.attemptedActualPrice, gained, this.attemptedEnchantments, this.attemptedDestructionTimer);
+                
+                // Track spent amount
+                this.totalSpent += this.attemptedActualPrice;
 
                 if (this.mc.player != null && this.mc.world != null) {
                     this.mc.world.playSound(this.mc.player, this.mc.player.getBlockPos(), SoundEvents.ENTITY_PLAYER_LEVELUP, SoundCategory.PLAYERS, 1.0F, 1.0F);
@@ -2021,10 +2040,16 @@ private double parseSelfDestructTime(ItemStack stack) {
 
         String messageContent = String.format("%s💰 **%s** sold **%s** for **%s**!", pingContent, playerName, itemName, this.formatPrice(salePrice));
         String salePriceStr = this.formatPrice(salePrice);
+        String totalSpentStr = this.formatPrice(this.totalSpent);
+        String totalSoldStr = this.formatPrice(this.totalSold);
+        double totalProfit = this.totalSold - this.totalSpent;
+        String totalProfitStr = this.formatPrice(Math.abs(totalProfit));
+        String profitStatus = totalProfit >= 0 ? "✅ Profit" : "❌ Loss";
 
-        return String.format("{\"content\":\"%s\",\"username\":\"%s\",\"avatar_url\":\"%s\",\"embeds\":[{\"title\":\"Glazed AH Sniper AutoSell Alert\",\"description\":\"Item sold through auto-sell.\",\"color\":65280,\"thumbnail\":{\"url\":\"%s\"},\"fields\":[{\"name\":\"📦 Item\",\"value\":\"%s\",\"inline\":true},{\"name\":\"💵 Sale Price\",\"value\":\"%s\",\"inline\":true},{\"name\":\"⏰ Timestamp\",\"value\":\"<t:%d:R>\",\"inline\":true}],\"footer\":{\"text\":\"Glazed AH Sniper V2\"},\"timestamp\":\"%s\"}]}",
+        return String.format("{\"content\":\"%s\",\"username\":\"%s\",\"avatar_url\":\"%s\",\"embeds\":[{\"title\":\"Glazed AH Sniper AutoSell Alert\",\"description\":\"Item sold through auto-sell. Session profit tracking enabled!\",\"color\":65280,\"thumbnail\":{\"url\":\"%s\"},\"fields\":[{\"name\":\"📦 Item\",\"value\":\"%s\",\"inline\":true},{\"name\":\"💵 Sale Price\",\"value\":\"%s\",\"inline\":true},{\"name\":\"⏰ Timestamp\",\"value\":\"<t:%d:R>\",\"inline\":true},{\"name\":\"💸 Total Spent\",\"value\":\"%s\",\"inline\":true},{\"name\":\"💰 Total Sold\",\"value\":\"%s\",\"inline\":true},{\"name\":\"%s Total\",\"value\":\"%s\",\"inline\":true}],\"footer\":{\"text\":\"Glazed AH Sniper V2\"},\"timestamp\":\"%s\"}]}",
             this.escapeJson(messageContent), this.escapeJson(webhookUsernameHardcoded), this.escapeJson(webhookAvatarUrlHardcoded),
-            this.escapeJson(webhookThumbnailUrlHardcoded), this.escapeJson(itemName), this.escapeJson(salePriceStr), timestamp, Instant.now().toString());
+            this.escapeJson(webhookThumbnailUrlHardcoded), this.escapeJson(itemName), this.escapeJson(salePriceStr), timestamp,
+            this.escapeJson(totalSpentStr), this.escapeJson(totalSoldStr), profitStatus, this.escapeJson(totalProfitStr), Instant.now().toString());
     }
 
     private void testWebhook() {
