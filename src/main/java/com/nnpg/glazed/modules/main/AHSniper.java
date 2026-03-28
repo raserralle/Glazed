@@ -104,6 +104,7 @@ public class AHSniper extends Module {
     private long purchaseTimestamp;
     private String attemptedEnchantments;
     private String attemptedDestructionTimer;
+    private double attemptedDestructionHours;
     private boolean commandSent;
     private boolean hasSetSort;
     private int previousItemCount;
@@ -494,6 +495,7 @@ public class AHSniper extends Module {
         this.purchaseTimestamp = 0L;
         this.attemptedEnchantments = "";
         this.attemptedDestructionTimer = "";
+        this.attemptedDestructionHours = 0.0;
         this.commandSent = false;
         this.hasSetSort = false;
         this.previousItemCount = 0;
@@ -641,6 +643,7 @@ public class AHSniper extends Module {
         this.sellingDelayCounter = 0;
         this.lastActionTicks = 0;
         this.attemptedEnchantments = "";
+        this.attemptedDestructionHours = 0.0;
         this.currentSnipedItem = null;
         this.lastClickedSlot = -1;
         if (this.debugMode.get()) {
@@ -770,7 +773,9 @@ public class AHSniper extends Module {
             this.attemptedActualPrice = price;
             this.attemptedQuantity = topLeft.getCount();
             this.attemptedEnchantments = this.getEnchantmentsString(topLeft);
-            this.attemptedDestructionTimer = this.formatDestructionTimer(this.parseSelfDestructTime(topLeft));
+            double destructionHours = this.parseSelfDestructTime(topLeft);
+            this.attemptedDestructionHours = destructionHours;
+            this.attemptedDestructionTimer = this.formatDestructionTimer(destructionHours);
             this.hasClickedBuy = true;
             this.lastActionTicks = 0;
         } else {
@@ -961,6 +966,19 @@ public class AHSniper extends Module {
         }
         if (this.hasClickedConfirm) return;
 
+        // Re-validate timer before confirming (prevents buying items whose timer dropped due to lag)
+        if (this.filterLowTime.get() && this.attemptedDestructionHours > 0) {
+            if (this.attemptedDestructionHours < this.minTimeHours.get()) {
+                if (this.notifications.get()) {
+                    this.info("CANCELLED: Item timer dropped below minimum (%.1f < %.1f hours)", this.attemptedDestructionHours, this.minTimeHours.get());
+                }
+                this.purchaseAttempted = false;
+                this.hasClickedBuy = false;
+                this.waitingForConfirmation = false;
+                return;
+            }
+        }
+
         if (this.clickConfirmButton(handler)) {
             this.lastActionTicks = 0;
             this.hasClickedConfirm = true;
@@ -1054,6 +1072,9 @@ public class AHSniper extends Module {
                         this.attemptedActualPrice = currentItemPrice;
                         this.attemptedQuantity = stack.getCount();
                         this.attemptedEnchantments = this.getEnchantmentsString(stack);
+                        double destructionHours = this.parseSelfDestructTime(stack);
+                        this.attemptedDestructionHours = destructionHours;
+                        this.attemptedDestructionTimer = this.formatDestructionTimer(destructionHours);
                         this.mc.interactionManager.clickSlot(handler.syncId, i, 1, SlotActionType.QUICK_MOVE, this.mc.player);
                         this.isProcessing = false;
                         this.hasClickedBuy = true;
@@ -1111,7 +1132,9 @@ public class AHSniper extends Module {
                 this.attemptedActualPrice = currentItemPrice;
                 this.attemptedQuantity = auctionItem.getCount();
                 this.attemptedEnchantments = this.getEnchantmentsString(auctionItem);
-                this.attemptedDestructionTimer = this.formatDestructionTimer(this.parseSelfDestructTime(auctionItem));
+                double destructionHours = this.parseSelfDestructTime(auctionItem);
+                this.attemptedDestructionHours = destructionHours;
+                this.attemptedDestructionTimer = this.formatDestructionTimer(destructionHours);
                 this.mc.interactionManager.clickSlot(handler.syncId, 15, 1, SlotActionType.QUICK_MOVE, this.mc.player);
                 this.hasClickedBuy = true;
                 this.purchaseAttempted = true;
