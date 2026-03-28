@@ -38,6 +38,7 @@ public class AHSniper extends Module {
     private final SettingGroup sgEnchantments;
     private final SettingGroup sgWebhook;
     private final SettingGroup sgAutoSell;
+    private final SettingGroup sgTimerConditions;
     private final SettingGroup sgUserFilter;
     private final Setting<SnipeMode> snipeMode;
     private final Setting<Item> snipingItem;
@@ -89,6 +90,22 @@ public class AHSniper extends Module {
     private final Setting<Boolean> exactEnchantments;
     private final Setting<Boolean> autoSell;
     private final Setting<String> sellPrice;
+    private final Setting<Boolean> timerConditionsEnabled;
+    private final Setting<Boolean> timerCondition1Enabled;
+    private final Setting<Double> timerThreshold1;
+    private final Setting<String> timerAdjustment1;
+    private final Setting<Boolean> timerCondition2Enabled;
+    private final Setting<Double> timerThreshold2;
+    private final Setting<String> timerAdjustment2;
+    private final Setting<Boolean> timerCondition3Enabled;
+    private final Setting<Double> timerThreshold3;
+    private final Setting<String> timerAdjustment3;
+    private final Setting<Boolean> timerCondition4Enabled;
+    private final Setting<Double> timerThreshold4;
+    private final Setting<String> timerAdjustment4;
+    private final Setting<Boolean> timerCondition5Enabled;
+    private final Setting<Double> timerThreshold5;
+    private final Setting<String> timerAdjustment5;
     private final Setting<Boolean> webhookEnabled;
     private final Setting<String> webhookUrl;
     private final Setting<Boolean> selfPing;
@@ -121,6 +138,7 @@ public class AHSniper extends Module {
     private int navigationDelayCounter;
     private boolean waitingToNavigate;
     private List<SnipeItemConfig> multiSnipeConfigs;
+    private List<TimerCondition> timerConditions;
     private Item currentSnipedItem;
     private int lastClickedSlot;
     private boolean pageJustRefreshed;
@@ -141,6 +159,7 @@ public class AHSniper extends Module {
         this.sgMultiSnipe = this.settings.createGroup("Multi-Snipe Items");
         this.sgEnchantments = this.settings.createGroup("Enchantments");
         this.sgAutoSell = this.settings.createGroup("Auto Sell");
+        this.sgTimerConditions = this.settings.createGroup("Destruction Timer Conditions");
         this.sgWebhook = this.settings.createGroup("Discord Webhook");
         this.sgUserFilter = this.settings.createGroup("User Filter");
 
@@ -443,6 +462,132 @@ public class AHSniper extends Module {
             .visible(this.autoSell::get)
             .build());
 
+        this.timerConditionsEnabled = this.sgTimerConditions.add(new BoolSetting.Builder()
+            .name("enable-timer-conditions")
+            .description("Enable conditional price adjustments based on destruction timer. Check conditions in order (1→2→3→etc). Price format: '+500k', '-1m', '+2.5m' (supports K, M, B suffixes).")
+            .defaultValue(false)
+            .build());
+
+        // Condition 1
+        this.timerCondition1Enabled = this.sgTimerConditions.add(new BoolSetting.Builder()
+            .name("condition-1-enabled")
+            .description("Enable condition 1. Check this first to unlock condition 2.")
+            .defaultValue(false)
+            .visible(() -> this.timerConditionsEnabled.get() && this.autoSell.get())
+            .build());
+
+        this.timerThreshold1 = this.sgTimerConditions.add(new DoubleSetting.Builder()
+            .name("threshold-1")
+            .description("Destruction timer threshold in hours (if timer >= this value, apply adjustment).")
+            .min(0.0)
+            .sliderMax(72.0)
+            .max(168.0)
+            .visible(() -> this.timerConditionsEnabled.get() && this.autoSell.get() && this.timerCondition1Enabled.get())
+            .build());
+
+        this.timerAdjustment1 = this.sgTimerConditions.add(new StringSetting.Builder()
+            .name("adjustment-1")
+            .description("Price adjustment for condition 1. Examples: '+500k', '-1m', '+2.5m'. Supports K, M, B suffixes.")
+            .defaultValue("")
+            .visible(() -> this.timerConditionsEnabled.get() && this.autoSell.get() && this.timerCondition1Enabled.get())
+            .build());
+
+        // Condition 2
+        this.timerCondition2Enabled = this.sgTimerConditions.add(new BoolSetting.Builder()
+            .name("condition-2-enabled")
+            .description("Enable condition 2. Check this to unlock condition 3.")
+            .defaultValue(false)
+            .visible(() -> this.timerConditionsEnabled.get() && this.autoSell.get() && this.timerCondition1Enabled.get())
+            .build());
+
+        this.timerThreshold2 = this.sgTimerConditions.add(new DoubleSetting.Builder()
+            .name("threshold-2")
+            .description("Destruction timer threshold in hours (if timer >= this value, apply adjustment).")
+            .min(0.0)
+            .sliderMax(72.0)
+            .max(168.0)
+            .visible(() -> this.timerConditionsEnabled.get() && this.autoSell.get() && this.timerCondition2Enabled.get())
+            .build());
+
+        this.timerAdjustment2 = this.sgTimerConditions.add(new StringSetting.Builder()
+            .name("adjustment-2")
+            .description("Price adjustment for condition 2. Examples: '+500k', '-1m', '+2.5m'. Supports K, M, B suffixes.")
+            .defaultValue("")
+            .visible(() -> this.timerConditionsEnabled.get() && this.autoSell.get() && this.timerCondition2Enabled.get())
+            .build());
+
+        // Condition 3
+        this.timerCondition3Enabled = this.sgTimerConditions.add(new BoolSetting.Builder()
+            .name("condition-3-enabled")
+            .description("Enable condition 3. Check this to unlock condition 4.")
+            .defaultValue(false)
+            .visible(() -> this.timerConditionsEnabled.get() && this.autoSell.get() && this.timerCondition2Enabled.get())
+            .build());
+
+        this.timerThreshold3 = this.sgTimerConditions.add(new DoubleSetting.Builder()
+            .name("threshold-3")
+            .description("Destruction timer threshold in hours (if timer >= this value, apply adjustment).")
+            .min(0.0)
+            .sliderMax(72.0)
+            .max(168.0)
+            .visible(() -> this.timerConditionsEnabled.get() && this.autoSell.get() && this.timerCondition3Enabled.get())
+            .build());
+
+        this.timerAdjustment3 = this.sgTimerConditions.add(new StringSetting.Builder()
+            .name("adjustment-3")
+            .description("Price adjustment for condition 3. Examples: '+500k', '-1m', '+2.5m'. Supports K, M, B suffixes.")
+            .defaultValue("")
+            .visible(() -> this.timerConditionsEnabled.get() && this.autoSell.get() && this.timerCondition3Enabled.get())
+            .build());
+
+        // Condition 4
+        this.timerCondition4Enabled = this.sgTimerConditions.add(new BoolSetting.Builder()
+            .name("condition-4-enabled")
+            .description("Enable condition 4. Check this to unlock condition 5.")
+            .defaultValue(false)
+            .visible(() -> this.timerConditionsEnabled.get() && this.autoSell.get() && this.timerCondition3Enabled.get())
+            .build());
+
+        this.timerThreshold4 = this.sgTimerConditions.add(new DoubleSetting.Builder()
+            .name("threshold-4")
+            .description("Destruction timer threshold in hours (if timer >= this value, apply adjustment).")
+            .min(0.0)
+            .sliderMax(72.0)
+            .max(168.0)
+            .visible(() -> this.timerConditionsEnabled.get() && this.autoSell.get() && this.timerCondition4Enabled.get())
+            .build());
+
+        this.timerAdjustment4 = this.sgTimerConditions.add(new StringSetting.Builder()
+            .name("adjustment-4")
+            .description("Price adjustment for condition 4. Examples: '+500k', '-1m', '+2.5m'. Supports K, M, B suffixes.")
+            .defaultValue("")
+            .visible(() -> this.timerConditionsEnabled.get() && this.autoSell.get() && this.timerCondition4Enabled.get())
+            .build());
+
+        // Condition 5
+        this.timerCondition5Enabled = this.sgTimerConditions.add(new BoolSetting.Builder()
+            .name("condition-5-enabled")
+            .description("Enable condition 5 (final condition).")
+            .defaultValue(false)
+            .visible(() -> this.timerConditionsEnabled.get() && this.autoSell.get() && this.timerCondition4Enabled.get())
+            .build());
+
+        this.timerThreshold5 = this.sgTimerConditions.add(new DoubleSetting.Builder()
+            .name("threshold-5")
+            .description("Destruction timer threshold in hours (if timer >= this value, apply adjustment).")
+            .min(0.0)
+            .sliderMax(72.0)
+            .max(168.0)
+            .visible(() -> this.timerConditionsEnabled.get() && this.autoSell.get() && this.timerCondition5Enabled.get())
+            .build());
+
+        this.timerAdjustment5 = this.sgTimerConditions.add(new StringSetting.Builder()
+            .name("adjustment-5")
+            .description("Price adjustment for condition 5. Examples: '+500k', '-1m', '+2.5m'. Supports K, M, B suffixes.")
+            .defaultValue("")
+            .visible(() -> this.timerConditionsEnabled.get() && this.autoSell.get() && this.timerCondition5Enabled.get())
+            .build());
+
         this.webhookEnabled = this.sgWebhook.add(new BoolSetting.Builder()
         .name("webhook-enabled")
         .description("Enable Discord webhook notifications.")
@@ -514,6 +659,7 @@ public class AHSniper extends Module {
         this.navigationDelayCounter = 0;
         this.waitingToNavigate = false;
         this.multiSnipeConfigs = new ArrayList<>();
+        this.timerConditions = new ArrayList<>();
         this.currentSnipedItem = null;
         this.lastClickedSlot = -1;
         this.pageJustRefreshed = false;
@@ -614,6 +760,40 @@ public class AHSniper extends Module {
         this.resetState();
         this.previousItemCount = this.countItemInInventory();
 
+        // Load timer conditions if enabled
+        if (this.timerConditionsEnabled.get() && this.autoSell.get()) {
+            this.timerConditions.clear();
+            
+            // Load condition 1 if enabled and configured
+            if (this.timerCondition1Enabled.get() && this.timerThreshold1.get() > 0 && !this.timerAdjustment1.get().isEmpty()) {
+                this.timerConditions.add(new TimerCondition(this.timerThreshold1.get(), this.timerAdjustment1.get()));
+            }
+            
+            // Load condition 2 if enabled and configured
+            if (this.timerCondition2Enabled.get() && this.timerThreshold2.get() > 0 && !this.timerAdjustment2.get().isEmpty()) {
+                this.timerConditions.add(new TimerCondition(this.timerThreshold2.get(), this.timerAdjustment2.get()));
+            }
+            
+            // Load condition 3 if enabled and configured
+            if (this.timerCondition3Enabled.get() && this.timerThreshold3.get() > 0 && !this.timerAdjustment3.get().isEmpty()) {
+                this.timerConditions.add(new TimerCondition(this.timerThreshold3.get(), this.timerAdjustment3.get()));
+            }
+            
+            // Load condition 4 if enabled and configured
+            if (this.timerCondition4Enabled.get() && this.timerThreshold4.get() > 0 && !this.timerAdjustment4.get().isEmpty()) {
+                this.timerConditions.add(new TimerCondition(this.timerThreshold4.get(), this.timerAdjustment4.get()));
+            }
+            
+            // Load condition 5 if enabled and configured
+            if (this.timerCondition5Enabled.get() && this.timerThreshold5.get() > 0 && !this.timerAdjustment5.get().isEmpty()) {
+                this.timerConditions.add(new TimerCondition(this.timerThreshold5.get(), this.timerAdjustment5.get()));
+            }
+
+            if (!this.timerConditions.isEmpty() && this.notifications.get()) {
+                this.info("Timer Conditions enabled! %d condition(s) loaded", this.timerConditions.size());
+            }
+        }
+
         if (this.debugMode.get()) {
             this.info("Debug: Webhook enabled: " + this.webhookEnabled.get());
             this.info("Debug: Webhook URL set: " + !this.webhookUrl.get().isEmpty());
@@ -625,6 +805,7 @@ public class AHSniper extends Module {
     public void onDeactivate() {
         this.resetState();
         this.multiSnipeConfigs.clear();
+        this.timerConditions.clear();
     }
 
     private void resetState() {
@@ -1290,6 +1471,16 @@ private double parseSelfDestructTime(ItemStack stack) {
             this.sellingPhase = false;
             return;
         }
+
+        // Apply timer conditions if enabled
+        if (this.timerConditionsEnabled.get() && !this.timerConditions.isEmpty()) {
+            double adjustedPrice = this.calculateAdjustedPrice(price, this.attemptedDestructionHours);
+            if (this.debugMode.get()) {
+                this.info("Debug: Original price: %s, Adjusted price: %s (timer: %.1f hours)", 
+                    this.formatPrice(price), this.formatPrice(adjustedPrice), this.attemptedDestructionHours);
+            }
+            price = adjustedPrice;
+        }
         
         // Find the purchased item in inventory and move it to hand
         if (this.mc.player != null && this.currentSnipedItem != null) {
@@ -1321,6 +1512,28 @@ private double parseSelfDestructTime(ItemStack stack) {
         this.sellingPhase = false;
         this.navigationDelayCounter = 5;
         this.lastActionTicks = 0;
+    }
+
+    private double calculateAdjustedPrice(double basePrice, double destructionHours) {
+        // Sort conditions by threshold in descending order (highest threshold first)
+        // This way, if timer is 50 hours and we have conditions for 24h and 48h, we apply 48h condition
+        List<TimerCondition> sortedConditions = new ArrayList<>(this.timerConditions);
+        sortedConditions.sort((a, b) -> Double.compare(b.thresholdHours, a.thresholdHours));
+
+        // Find the matching condition (first one where timer >= threshold)
+        for (TimerCondition condition : sortedConditions) {
+            if (destructionHours >= condition.thresholdHours) {
+                double adjustment = this.parsePrice(condition.priceAdjustment);
+                if (adjustment != -1.0) {
+                    double finalPrice = basePrice + adjustment;
+                    // Ensure price doesn't go below 1
+                    return Math.max(finalPrice, 1.0);
+                }
+            }
+        }
+
+        // If no condition matched, return base price
+        return basePrice;
     }
 
     private boolean isValidAuctionItem(ItemStack stack) {
@@ -1979,6 +2192,16 @@ private double parseTooltipPrice(List<Text> tooltip) {
             this.priceMode = priceMode;
             this.enchantments = new ArrayList<>();
             this.exactEnchantments = false;
+        }
+    }
+
+    public static class TimerCondition {
+        public double thresholdHours;
+        public String priceAdjustment;
+
+        public TimerCondition(double thresholdHours, String priceAdjustment) {
+            this.thresholdHours = thresholdHours;
+            this.priceAdjustment = priceAdjustment;
         }
     }
 }
