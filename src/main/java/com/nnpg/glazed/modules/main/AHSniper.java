@@ -983,6 +983,13 @@ public class AHSniper extends Module {
     private void onChatMessage(ReceiveMessageEvent event) {
         String msg = event.getMessage().getString();
 
+        // Check for stats command
+        if (msg.startsWith(".ahstats") || msg.startsWith("/ahstats")) {
+            event.cancel();
+            this.openStatsScreen();
+            return;
+        }
+
         // Detect sale message: "PlayerName bought your ItemName for $Price"
         // This can happen anytime, while we're sniping or doing anything else
         if (msg.contains("bought your")) {
