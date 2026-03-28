@@ -1431,14 +1431,17 @@ private double parseSelfDestructTime(ItemStack stack) {
 
             double hours = 0.0;
 
-            Matcher d = Pattern.compile("(\\d+)d").matcher(timer);
+            Matcher d = Pattern.compile("(\\d+)\\s*d").matcher(timer);
             if (d.find()) hours += Integer.parseInt(d.group(1)) * 24.0;
 
-            Matcher h = Pattern.compile("(\\d+)h").matcher(timer);
+            Matcher h = Pattern.compile("(\\d+)\\s*h").matcher(timer);
             if (h.find()) hours += Integer.parseInt(h.group(1));
 
-            Matcher m = Pattern.compile("(\\d+)m").matcher(timer);
+            Matcher m = Pattern.compile("(\\d+)\\s*m(?!in)").matcher(timer);
             if (m.find()) hours += Integer.parseInt(m.group(1)) / 60.0;
+
+            Matcher s = Pattern.compile("(\\d+)\\s*s").matcher(timer);
+            if (s.find()) hours += Integer.parseInt(s.group(1)) / 3600.0;
 
             return hours;
         }
