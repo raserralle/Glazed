@@ -103,6 +103,7 @@ public class AHSniper extends Module {
     private int attemptedQuantity;
     private long purchaseTimestamp;
     private String attemptedEnchantments;
+    private String attemptedDestructionTimer;
     private boolean commandSent;
     private boolean hasSetSort;
     private int previousItemCount;
@@ -492,6 +493,7 @@ public class AHSniper extends Module {
         this.attemptedQuantity = 0;
         this.purchaseTimestamp = 0L;
         this.attemptedEnchantments = "";
+        this.attemptedDestructionTimer = "";
         this.commandSent = false;
         this.hasSetSort = false;
         this.previousItemCount = 0;
@@ -768,6 +770,7 @@ public class AHSniper extends Module {
             this.attemptedActualPrice = price;
             this.attemptedQuantity = topLeft.getCount();
             this.attemptedEnchantments = this.getEnchantmentsString(topLeft);
+            this.attemptedDestructionTimer = this.formatDestructionTimer(this.parseSelfDestructTime(topLeft));
             this.hasClickedBuy = true;
             this.lastActionTicks = 0;
         } else {
@@ -1108,6 +1111,7 @@ public class AHSniper extends Module {
                 this.attemptedActualPrice = currentItemPrice;
                 this.attemptedQuantity = auctionItem.getCount();
                 this.attemptedEnchantments = this.getEnchantmentsString(auctionItem);
+                this.attemptedDestructionTimer = this.formatDestructionTimer(this.parseSelfDestructTime(auctionItem));
                 this.mc.interactionManager.clickSlot(handler.syncId, 15, 1, SlotActionType.QUICK_MOVE, this.mc.player);
                 this.hasClickedBuy = true;
                 this.purchaseAttempted = true;
@@ -1512,7 +1516,7 @@ private double parseSelfDestructTime(ItemStack stack) {
                 if (this.notifications.get()) {
                     this.info("Purchase successful! Got %dx %s for %s", this.attemptedQuantity, this.attemptedItemName, this.formatPrice(this.attemptedActualPrice));
                 }
-                this.sendSuccessWebhook(this.attemptedItemName, this.attemptedActualPrice, gained, this.attemptedEnchantments);
+                this.sendSuccessWebhook(this.attemptedItemName, this.attemptedActualPrice, gained, this.attemptedEnchantments, this.attemptedDestructionTimer);
 
                 if (this.mc.player != null && this.mc.world != null) {
                     this.mc.world.playSound(this.mc.player, this.mc.player.getBlockPos(), SoundEvents.ENTITY_PLAYER_LEVELUP, SoundCategory.PLAYERS, 1.0F, 1.0F);
@@ -1566,7 +1570,7 @@ private double parseSelfDestructTime(ItemStack stack) {
         ChatUtils.info(String.format(message, args));
     }
 
-    private void sendSuccessWebhook(String itemName, double actualPrice, int quantity, String enchantments) {
+    private void sendSuccessWebhook(String itemName, double actualPrice, int quantity, String enchantments, String destructionTimer) {
         if (!this.webhookEnabled.get() || this.webhookUrl.get().isEmpty()) {
             if (this.debugMode.get()) {
                 this.info("Debug: Webhook not sent - Enabled: %s, URL set: %s", this.webhookEnabled.get(), !this.webhookUrl.get().isEmpty());
@@ -1576,10 +1580,10 @@ private double parseSelfDestructTime(ItemStack stack) {
 
         if (this.debugMode.get()) {
             this.info("Debug: Creating webhook payload...");
-            this.info("Debug: Item: %s, Quantity: %d, Price: %s, Enchants: %s", itemName, quantity, this.formatPrice(actualPrice), enchantments);
+            this.info("Debug: Item: %s, Quantity: %d, Price: %s, Enchants: %s, Timer: %s", itemName, quantity, this.formatPrice(actualPrice), enchantments, destructionTimer);
         }
 
-        String jsonPayload = this.createSuccessEmbed(itemName, actualPrice, quantity, enchantments);
+        String jsonPayload = this.createSuccessEmbed(itemName, actualPrice, quantity, enchantments, destructionTimer);
         this.sendWebhookMessage(jsonPayload, "Success");
     }
 
@@ -1617,7 +1621,7 @@ private double parseSelfDestructTime(ItemStack stack) {
                 }
     }
 
-    private String createSuccessEmbed(String itemName, double actualPrice, int quantity, String enchantments) {
+    private String createSuccessEmbed(String itemName, double actualPrice, int quantity, String enchantments, String destructionTimer) {
         String playerName = this.mc.player != null ? this.mc.player.getName().getString() : "Unknown";
         long timestamp = System.currentTimeMillis() / 1000L;
 
@@ -1674,12 +1678,12 @@ private double parseSelfDestructTime(ItemStack stack) {
 
         String modeText = this.snipeMode.get() == SnipeMode.MULTI ? "Multi-Snipe" : "Single-Snipe";
 
-        return String.format("{\"content\":\"%s\",\"username\":\"%s\",\"avatar_url\":\"%s\",\"embeds\":[{\"title\":\"Glazed AH Sniper Alert [%s]\",\"description\":\"%s\",\"color\":8388736,\"thumbnail\":{\"url\":\"%s\"},\"fields\":[{\"name\":\"\ud83d\udce6 Item\",\"value\":\"%s x%d\",\"inline\":true},{\"name\":\"\ud83d\udcb0 Purchase Price\",\"value\":\"%s\",\"inline\":true},{\"name\":\"\ud83d\udcb5 Max Price\",\"value\":\"%s (%s)\",\"inline\":true},{\"name\":\"\u2728 Enchantments\",\"value\":\"%s\",\"inline\":false},{\"name\":\"\u23f0 Time\",\"value\":\"<t:%d:R>\",\"inline\":true}],\"footer\":{\"text\":\"Glazed AH Sniper V2\"},\"timestamp\":\"%s\"}]}",
+        return String.format("{\"content\":\"%s\",\"username\":\"%s\",\"avatar_url\":\"%s\",\"embeds\":[{\"title\":\"Glazed AH Sniper Alert [%s]\",\"description\":\"%s\",\"color\":8388736,\"thumbnail\":{\"url\":\"%s\"},\"fields\":[{\"name\":\"\ud83d\udce6 Item\",\"value\":\"%s x%d\",\"inline\":true},{\"name\":\"\ud83d\udcb0 Purchase Price\",\"value\":\"%s\",\"inline\":true},{\"name\":\"\ud83d\udcb5 Max Price\",\"value\":\"%s (%s)\",\"inline\":true},{\"name\":\"\u2728 Enchantments\",\"value\":\"%s\",\"inline\":false},{\"name\":\"\u23f0 Destruction Timer\",\"value\":\"%s\",\"inline\":true},{\"name\":\"\u231a Timestamp\",\"value\":\"<t:%d:R>\",\"inline\":true}],\"footer\":{\"text\":\"Glazed AH Sniper V2\"},\"timestamp\":\"%s\"}]}",
             this.escapeJson(messageContent), this.escapeJson(webhookUsernameHardcoded), this.escapeJson(webhookAvatarUrlHardcoded),
             modeText, this.escapeJson(description), this.escapeJson(webhookThumbnailUrlHardcoded),
             this.escapeJson(itemName), quantity, this.escapeJson(actualPriceStr),
             this.escapeJson(maxPriceStr), this.escapeJson(priceModeStr.toLowerCase()),
-            this.escapeJson(enchantValue), timestamp, Instant.now().toString());
+            this.escapeJson(enchantValue), this.escapeJson(destructionTimer), timestamp, Instant.now().toString());
     }
 
     private void testWebhook() {
@@ -1716,6 +1720,23 @@ private double parseSelfDestructTime(ItemStack stack) {
             return String.format("%.1fK", price / 1_000.0);
         } else {
             return String.format("%.0f", price);
+        }
+    }
+
+    private String formatDestructionTimer(double hours) {
+        // -1.0 means no timer found
+        if (hours < 0) return "N/A";
+        if (hours == 0) return "N/A";
+        if (hours >= 24) {
+            int days = (int) hours / 24;
+            int remainingHours = (int) hours % 24;
+            if (remainingHours > 0) {
+                return String.format("%dd %dh", days, remainingHours);
+            } else {
+                return String.format("%dd", days);
+            }
+        } else {
+            return String.format("%.1fh", hours);
         }
     }
 
