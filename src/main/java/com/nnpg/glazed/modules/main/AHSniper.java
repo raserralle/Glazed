@@ -1,6 +1,7 @@
 package com.nnpg.glazed.modules.main;
 
 import com.nnpg.glazed.GlazedAddon;
+import com.nnpg.glazed.utils.Statistics;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -151,9 +152,9 @@ public class AHSniper extends Module {
     private final int MAX_STAGNANT_TICKS;
     private String lastSoldItemName;
     private double lastSoldPrice;
-    private double totalSpent;
-    private double totalSold;
     private int itemsOnSale;
+    private Statistics stats;
+    private long sessionStartTime;
     private final HttpClient httpClient;
 
     public AHSniper() {
@@ -675,9 +676,10 @@ public class AHSniper extends Module {
         this.MAX_STAGNANT_TICKS = 2200;
         this.lastSoldItemName = "";
         this.lastSoldPrice = 0;
-        this.totalSpent = 0;
-        this.totalSold = 0;
         this.itemsOnSale = 0;
+        this.stats = new Statistics();
+        this.stats.load();
+        this.sessionStartTime = 0;
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10L)).build();
     }
 
@@ -765,6 +767,7 @@ public class AHSniper extends Module {
 
         this.resetState();
         this.previousItemCount = this.countItemInInventory();
+        this.sessionStartTime = System.currentTimeMillis();
 
         // Load timer conditions if enabled
         if (this.timerConditionsEnabled.get() && this.autoSell.get()) {
@@ -814,12 +817,15 @@ public class AHSniper extends Module {
         this.timerConditions.clear();
         
         // Show final profit summary on deactivate
-        if ((this.totalSpent > 0 || this.totalSold > 0) && this.notifications.get()) {
-            double profit = this.totalSold - this.totalSpent;
+        if ((this.stats.allTimeSold > 0 || this.stats.allTimeSpent > 0) && this.notifications.get()) {
+            double sessionProfit = this.stats.getDailyProfit();
+            double hourlyRate = this.stats.getHourlyRate(this.sessionStartTime);
+            
             this.info("===== Session Summary =====");
-            this.info("Total Spent: %s", this.formatPrice(this.totalSpent));
-            this.info("Total Sold: %s", this.formatPrice(this.totalSold));
-            this.info("Total Profit: %s", this.formatPrice(profit));
+            this.info("Session Profit: %s", this.formatPrice(sessionProfit));
+            this.info("Session Hourly Rate: %s/hr", this.formatPrice(hourlyRate));
+            this.info("Daily Profit: %s", this.formatPrice(this.stats.getDailyProfit()));
+            this.info("All-Time Profit: %s", this.formatPrice(this.stats.getAllTimeProfit()));
             this.info("Items Still On Sale: %d", this.itemsOnSale);
         }
     }
@@ -975,7 +981,7 @@ public class AHSniper extends Module {
                 this.lastSoldPrice = this.parsePrice(priceStr);
                 
                 // Track sold amount
-                this.totalSold += this.lastSoldPrice;
+                this.stats.incrementSold(this.lastSoldPrice);
                 
                 // Decrement items on sale counter
                 if (this.itemsOnSale > 0) {
@@ -1848,7 +1854,7 @@ private double parseSelfDestructTime(ItemStack stack) {
                 this.sendSuccessWebhook(this.attemptedItemName, this.attemptedActualPrice, gained, this.attemptedEnchantments, this.attemptedDestructionTimer);
                 
                 // Track spent amount
-                this.totalSpent += this.attemptedActualPrice;
+                this.stats.incrementSpent(this.attemptedActualPrice);
 
                 if (this.mc.player != null && this.mc.world != null) {
                     this.mc.world.playSound(this.mc.player, this.mc.player.getBlockPos(), SoundEvents.ENTITY_PLAYER_LEVELUP, SoundCategory.PLAYERS, 1.0F, 1.0F);
@@ -2049,17 +2055,26 @@ private double parseSelfDestructTime(ItemStack stack) {
 
         String messageContent = String.format("%s💰 **%s** sold **%s** for **%s**!", pingContent, playerName, itemName, this.formatPrice(salePrice));
         String salePriceStr = this.formatPrice(salePrice);
-        String totalSpentStr = this.formatPrice(this.totalSpent);
-        String totalSoldStr = this.formatPrice(this.totalSold);
-        double totalProfit = this.totalSold - this.totalSpent;
-        String totalProfitStr = this.formatPrice(Math.abs(totalProfit));
-        String profitStatus = totalProfit >= 0 ? "✅ Profit" : "❌ Loss";
+        String allTimeSpentStr = this.formatPrice(this.stats.allTimeSpent);
+        String allTimeSoldStr = this.formatPrice(this.stats.allTimeSold);
+        String dailySpentStr = this.formatPrice(this.stats.dailySpent);
+        String dailySoldStr = this.formatPrice(this.stats.dailySold);
+        double allTimeProfit = this.stats.getAllTimeProfit();
+        double dailyProfit = this.stats.getDailyProfit();
+        double hourlyRate = this.stats.getHourlyRate(this.sessionStartTime);
+        String allTimeProfitStr = this.formatPrice(Math.abs(allTimeProfit));
+        String dailyProfitStr = this.formatPrice(Math.abs(dailyProfit));
+        String hourlyRateStr = this.formatPrice(Math.abs(hourlyRate));
+        String allTimeProfitStatus = allTimeProfit >= 0 ? "✅ All-Time Profit" : "❌ All-Time Loss";
+        String dailyProfitStatus = dailyProfit >= 0 ? "✅ Daily Profit" : "❌ Daily Loss";
         String itemsOnSaleStr = String.valueOf(this.itemsOnSale);
 
-        return String.format("{\"content\":\"%s\",\"username\":\"%s\",\"avatar_url\":\"%s\",\"embeds\":[{\"title\":\"Glazed AH Sniper AutoSell Alert\",\"description\":\"Item sold through auto-sell. Session profit tracking enabled!\",\"color\":65280,\"thumbnail\":{\"url\":\"%s\"},\"fields\":[{\"name\":\"📦 Item\",\"value\":\"%s\",\"inline\":true},{\"name\":\"💵 Sale Price\",\"value\":\"%s\",\"inline\":true},{\"name\":\"⏰ Timestamp\",\"value\":\"<t:%d:R>\",\"inline\":true},{\"name\":\"💸 Total Spent\",\"value\":\"%s\",\"inline\":true},{\"name\":\"💰 Total Sold\",\"value\":\"%s\",\"inline\":true},{\"name\":\"%s Total\",\"value\":\"%s\",\"inline\":true},{\"name\":\"📊 Items On Sale\",\"value\":\"%s\",\"inline\":false}],\"footer\":{\"text\":\"Glazed AH Sniper V2\"},\"timestamp\":\"%s\"}]}",
+        return String.format("{\"content\":\"%s\",\"username\":\"%s\",\"avatar_url\":\"%s\",\"embeds\":[{\"title\":\"Glazed AH Sniper AutoSell Alert\",\"description\":\"Item sold through auto-sell. Comprehensive statistics enabled!\",\"color\":65280,\"thumbnail\":{\"url\":\"%s\"},\"fields\":[{\"name\":\"📦 Item\",\"value\":\"%s\",\"inline\":true},{\"name\":\"💵 Sale Price\",\"value\":\"%s\",\"inline\":true},{\"name\":\"⏰ Timestamp\",\"value\":\"<t:%d:R>\",\"inline\":true},{\"name\":\"💸 All-Time Spent\",\"value\":\"%s\",\"inline\":true},{\"name\":\"💰 All-Time Sold\",\"value\":\"%s\",\"inline\":true},{\"name\":\"%s\",\"value\":\"%s\",\"inline\":true},{\"name\":\"💸 Daily Spent\",\"value\":\"%s\",\"inline\":true},{\"name\":\"💰 Daily Sold\",\"value\":\"%s\",\"inline\":true},{\"name\":\"%s\",\"value\":\"%s\",\"inline\":true},{\"name\":\"⚡ Hourly Rate\",\"value\":\"%s/hr\",\"inline\":true},{\"name\":\"📊 Items On Sale\",\"value\":\"%s\",\"inline\":false}],\"footer\":{\"text\":\"Glazed AH Sniper V2\"},\"timestamp\":\"%s\"}]}",
             this.escapeJson(messageContent), this.escapeJson(webhookUsernameHardcoded), this.escapeJson(webhookAvatarUrlHardcoded),
             this.escapeJson(webhookThumbnailUrlHardcoded), this.escapeJson(itemName), this.escapeJson(salePriceStr), timestamp,
-            this.escapeJson(totalSpentStr), this.escapeJson(totalSoldStr), profitStatus, this.escapeJson(totalProfitStr), itemsOnSaleStr, Instant.now().toString());
+            this.escapeJson(allTimeSpentStr), this.escapeJson(allTimeSoldStr), allTimeProfitStatus, this.escapeJson(allTimeProfitStr),
+            this.escapeJson(dailySpentStr), this.escapeJson(dailySoldStr), dailyProfitStatus, this.escapeJson(dailyProfitStr),
+            this.escapeJson(hourlyRateStr), itemsOnSaleStr, Instant.now().toString());
     }
 
     private void testWebhook() {
