@@ -700,7 +700,11 @@ public class AHSniper extends Module {
                     this.info("Purchase timed out, continuing to snipe...");
                 }
             }
-
+            ScreenHandler screenHandler = this.mc.player.currentScreenHandler;
+            if (this.isConfirmationGUI(screenHandler)) {
+                this.handleConfirmationGUI((GenericContainerScreenHandler) screenHandler);
+                return;
+            }
             this.handlePurchaseCheck();
             return;
         }
@@ -1139,20 +1143,37 @@ public class AHSniper extends Module {
         return enchantStr.contains("vanishing_curse") || enchantStr.contains("binding_curse");
     }
 
-    private double parseSelfDestructTime(ItemStack stack) {
-        List<Text> tooltip = stack.getTooltip(Item.TooltipContext.create(this.mc.world), this.mc.player, TooltipType.BASIC);
-        StringBuilder full = new StringBuilder();
-            for (Text line : tooltip) {
-            full.append("\n").append(line.getString());
+private double parseSelfDestructTime(ItemStack stack) {
+    List<Text> tooltip = stack.getTooltip(Item.TooltipContext.create(this.mc.world), this.mc.player, TooltipType.BASIC);
+
+    for (int i = 0; i < tooltip.size(); i++) {
+        String line = tooltip.get(i).getString().toLowerCase();
+
+        // Detect the header
+        if (line.contains("self destruct")) {
+            // Timer is always on the next line
+            if (i + 1 >= tooltip.size()) return -1.0;
+
+            String timer = tooltip.get(i + 1).getString().toLowerCase();
+
+            double hours = 0.0;
+
+            Matcher d = Pattern.compile("(\\d+)d").matcher(timer);
+            if (d.find()) hours += Integer.parseInt(d.group(1)) * 24.0;
+
+            Matcher h = Pattern.compile("(\\d+)h").matcher(timer);
+            if (h.find()) hours += Integer.parseInt(h.group(1));
+
+            Matcher m = Pattern.compile("(\\d+)m").matcher(timer);
+            if (m.find()) hours += Integer.parseInt(m.group(1)) / 60.0;
+
+            return hours;
         }
-        String fullStr = full.toString().toLowerCase();
-        Pattern p = Pattern.compile("self\\s*destruct[:\\s]*([\\d\\s+d+h+m+s]+)");
-        Matcher m = p.matcher(fullStr);
-        if (m.find()) {
-            return this.parseTimeString(m.group(1).trim());
-        }
-        return -1.0;
     }
+
+    return -1.0;
+}
+
 
     private double parseTimeString(String timeStr) {
         if (timeStr == null || timeStr.trim().isEmpty()) return -1.0;
@@ -1218,7 +1239,25 @@ public class AHSniper extends Module {
 
         if (this.filterLowTime.get()) {
             double timeLeft = this.parseSelfDestructTime(stack);
-            if (timeLeft != -1.0 && timeLeft < this.minTimeHours.get()) return false;
+            if (this.debugMode.get()) {
+                if (timeLeft != -1.0) {
+                    this.info("Debug: Item destruction timer: %.2f hours (min required: %.2f)", timeLeft, this.minTimeHours.get());
+                } else {
+                    this.info("Debug: No destruction timer found for item");
+                }
+            }
+            if (timeLeft == -1.0) {
+                if (this.debugMode.get()) {
+                    this.info("Debug: Item rejected - no timer found (required: %.2f hours)", this.minTimeHours.get());
+                }
+                return false;
+            }
+            if (timeLeft < this.minTimeHours.get()) {
+                if (this.debugMode.get()) {
+                    this.info("Debug: Item rejected - timer too low (%.2f < %.2f)", timeLeft, this.minTimeHours.get());
+                }
+                return false;
+            }
         }
 
         if (this.enchantmentMode.get() && !this.requiredEnchantments.get().isEmpty() && !this.hasValidEnchantments(stack)) {
@@ -1680,47 +1719,41 @@ public class AHSniper extends Module {
         }
     }
 
-    private double parseTooltipPrice(List<Text> tooltip) {
-        if (tooltip == null || tooltip.isEmpty()) return -1.0;
+private double parseTooltipPrice(List<Text> tooltip) {
+    if (tooltip == null || tooltip.isEmpty()) return -1.0;
 
-        Pattern[] pricePatterns = new Pattern[]{
-            Pattern.compile("\\$([\\d,]+(?:\\.[\\d]+)?)([kmb])?", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("(?i)price\\s*:\\s*([\\d,]+(?:\\.[\\d]+)?)([kmb])?", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("(?i)buy\\s+for\\s*:\\s*([\\d,]+(?:\\.[\\d]+)?)([kmb])?", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("([\\d,]+(?:\\.[\\d]+)?)([kmb])?\\s*coins?", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("\\b([\\d,]+(?:\\.[\\d]+)?)([kmb])\\b", Pattern.CASE_INSENSITIVE)
-        };
+    Pattern pricePattern = Pattern.compile("(?:\\$)?([\\d,.]+)\\s*([kmb])?", Pattern.CASE_INSENSITIVE);
 
-        for (Text line : tooltip) {
-            String text = line.getString().replace(",", "").toLowerCase();
-            if (text.contains("trillion") || text.contains(" t")) {
-                return 999_999_999_999_999.0;
-            }
+    for (Text line : tooltip) {
+        String text = line.getString().toLowerCase().replace(",", "");
 
-            for (Pattern pattern : pricePatterns) {
-                Matcher matcher = pattern.matcher(line.getString());
-                if (matcher.find()) {
-                    String numberStr = matcher.group(1).replace(",", "");
-                    String suffix = "";
-                    if (matcher.groupCount() >= 2 && matcher.group(2) != null) {
-                        suffix = matcher.group(2).toLowerCase();
-                    }
-                    try {
-                        double basePrice = Double.parseDouble(numberStr);
-                        double multiplier = switch (suffix) {
-                            case "k" -> 1_000.0;
-                            case "m" -> 1_000_000.0;
-                            case "b" -> 1_000_000_000.0;
-                            default -> 1.0;
-                        };
-                        return basePrice * multiplier;
-                    } catch (NumberFormatException e) {
-                    }
-                }
-            }
+        // Accept lines that look like price lines:
+        // "$26m", "price: 2", "price: 39m", etc.
+        if (!(text.startsWith("$") || text.contains("price:"))) continue;
+
+        Matcher matcher = pricePattern.matcher(text);
+        if (matcher.find()) {
+            String numberStr = matcher.group(1);
+            String suffix = matcher.group(2) != null ? matcher.group(2).toLowerCase() : "";
+
+            try {
+                double base = Double.parseDouble(numberStr);
+                return switch (suffix) {
+                    case "k" -> base * 1_000;
+                    case "m" -> base * 1_000_000;
+                    case "b" -> base * 1_000_000_000;
+                    default -> base;
+                };
+            } catch (NumberFormatException ignored) {}
         }
-        return -1.0;
     }
+
+    return -1.0;
+}
+
+
+
+
 
     private double parsePrice(String priceStr) {
         if (priceStr == null || priceStr.isEmpty()) return -1.0;
