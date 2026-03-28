@@ -372,6 +372,181 @@ public class Statistics {
      * @param sessionDurationMs Current session duration in milliseconds
      * @return DetailedStats object with all calculated metrics
      */
+    /**
+     * Calculate price volatility (standard deviation from average price).
+     */
+    public double calculatePriceVolatility() {
+        if (this.purchaseHistory.isEmpty()) return 0.0;
+        double avgPrice = this.getAvgPurchasePrice();
+        double sumSquaredDiff = 0;
+        for (Transaction t : this.purchaseHistory) {
+            double diff = (t.price / t.quantity) - avgPrice;
+            sumSquaredDiff += diff * diff;
+        }
+        return Math.sqrt(sumSquaredDiff / this.purchaseHistory.size());
+    }
+
+    /**
+     * Get projected daily profit if current hourly rate continues.
+     */
+    public double calculateProjectedDailyProfit(long sessionStartTime) {
+        long sessionDuration = System.currentTimeMillis() - sessionStartTime;
+        if (sessionDuration <= 0) return 0.0;
+        double currentHourlyRate = this.getHourlyRate(sessionStartTime);
+        return currentHourlyRate * 24.0;
+    }
+
+    /**
+     * Calculate estimated time to sell all current items (hours).
+     */
+    public double calculateInventoryTurnoverHours(int currentItemsOnSale) {
+        if (this.totalItemsSold <= 0 || this.totalSessionTime <= 0) return 0.0;
+        double itemsPerHour = this.calculateItemsPerHour();
+        if (itemsPerHour <= 0) return 0.0;
+        return currentItemsOnSale / itemsPerHour;
+    }
+
+    /**
+     * Find peak earning hour (0-23) based on transaction timestamps.
+     */
+    public int findPeakEarningHour() {
+        if (this.salesHistory.isEmpty()) return -1;
+        int[] hourCounts = new int[24];
+        for (Transaction t : this.salesHistory) {
+            java.time.LocalDateTime dt = java.time.Instant.ofEpochMilli(t.timestamp)
+                    .atZone(java.time.ZoneId.systemDefault()).toLocalDateTime();
+            hourCounts[dt.getHour()]++;
+        }
+        int maxHour = 0;
+        for (int i = 1; i < 24; i++) {
+            if (hourCounts[i] > hourCounts[maxHour]) maxHour = i;
+        }
+        return hourCounts[maxHour] > 0 ? maxHour : -1;
+    }
+
+    /**
+     * Find best snipe hour based on purchase success rate.
+     */
+    public int findBestSnipeHour() {
+        if (this.purchaseHistory.isEmpty()) return -1;
+        int[] successCounts = new int[24];
+        int[] attemptCounts = new int[24];
+        for (Transaction t : this.purchaseHistory) {
+            java.time.LocalDateTime dt = java.time.Instant.ofEpochMilli(t.timestamp)
+                    .atZone(java.time.ZoneId.systemDefault()).toLocalDateTime();
+            successCounts[dt.getHour()]++;
+        }
+        // Approximate attempts based on ratio
+        int totalAttempts = this.totalItemsPurchased + this.attemptedPurchases;
+        double successRatio = this.totalItemsPurchased > 0 ? (double) this.totalItemsPurchased / totalAttempts : 0;
+        
+        int bestHour = 0;
+        double bestRate = 0;
+        for (int i = 0; i < 24; i++) {
+            double rate = successCounts[i] > 0 ? successCounts[i] / (successCounts[i] / successRatio) : 0;
+            if (rate > bestRate) {
+                bestRate = rate;
+                bestHour = i;
+            }
+        }
+        return bestHour;
+    }
+
+    /**
+     * Estimate price floor (minimum profitable buy price).
+     */
+    public double estimatePriceFloor() {
+        if (this.purchaseHistory.isEmpty()) return 0.0;
+        double avgPurchase = this.getAvgPurchasePrice();
+        double volatility = this.calculatePriceVolatility();
+        // Floor = average - 1 standard deviation
+        return Math.max(0, avgPurchase - volatility);
+    }
+
+    /**
+     * Estimate price ceiling (maximum sale price).
+     */
+    public double estimatePriceCeiling() {
+        if (this.salesHistory.isEmpty()) return 0.0;
+        double avgSale = this.getAvgSalePrice();
+        // Ceiling = average + 5% (conservative estimate)
+        return avgSale * 1.05;
+    }
+
+    /**
+     * Calculate capital efficiency (profit per coin invested).
+     */
+    public double calculateCapitalEfficiency() {
+        if (this.allTimeSpent <= 0) return 0.0;
+        return this.getAllTimeProfit() / this.allTimeSpent;
+    }
+
+    /**
+     * Calculate capital velocity (how fast money turns over).
+     */
+    public double calculateCapitalVelocity() {
+        if (this.allTimeSpent <= 0) return 0.0;
+        return this.allTimeSold / this.allTimeSpent;
+    }
+
+    /**
+     * Calculate consistency score (lower variance = higher score, 0-100).
+     */
+    public double calculateConsistencyScore() {
+        if (this.totalSessions <= 1) return 0.0;
+        double avgProfit = this.getAllTimeProfit() / this.totalSessions;
+        double sumSquaredDiff = 0;
+        
+        // Approximate per-session profit variance
+        double profitPerSession = avgProfit;
+        // If profit is consistent, variance is low, score is high
+        // Simple heuristic: consistency based on profit margin stability
+        double marginVariance = Math.abs(this.calculateProfitMarginPercent() - this.calculateDailyProfitMarginPercent());
+        // Convert variance to 0-100 scale (lower variance = higher score)
+        return Math.max(0, 100.0 - marginVariance);
+    }
+
+    /**
+     * Calculate profit acceleration (change in hourly rate trend).
+     */
+    public double calculateProfitAcceleration(long sessionStartTime) {
+        if (this.totalSessionTime < 3600000) return 0.0; // Need at least 1 hour
+        
+        long now = System.currentTimeMillis();
+        long sessionDuration = now - sessionStartTime;
+        
+        // Split into two halves and compare rates
+        long halfSessionMs = sessionDuration / 2;
+        long firstHalfStart = sessionStartTime;
+        long secondHalfStart = sessionStartTime + halfSessionMs;
+        
+        // Estimate first half rate
+        double firstHalfRate = this.getDailyProfit() / (halfSessionMs / 3600000.0) * 0.5;
+        // Current rate
+        double currentRate = this.getHourlyRate(sessionStartTime);
+        
+        // Acceleration is the change
+        return currentRate - firstHalfRate;
+    }
+
+    /**
+     * Calculate success rate trend (improvement or decline).
+     */
+    public double calculateSuccessRateTrend() {
+        if (this.purchaseHistory.size() < 10) return 0.0;
+        
+        // Compare last 5 transactions to first 5
+        int recentSuccesses = Math.min(5, this.purchaseHistory.size());
+        int olderSuccesses = Math.min(5, Math.max(0, this.purchaseHistory.size() - 10));
+        
+        if (olderSuccesses == 0) return 0.0;
+        
+        double recentRate = (double) recentSuccesses / 5.0;
+        double olderRate = (double) olderSuccesses / 5.0;
+        
+        return (recentRate - olderRate) * 100.0;
+    }
+
     public DetailedStats getDetailedStats(int currentItemsOnSale, long sessionDurationMs) {
         DetailedStats stats = new DetailedStats();
 
@@ -410,6 +585,26 @@ public class Statistics {
         // Performance
         stats.purchaseSuccessRate = this.calculatePurchaseSuccessRate();
         stats.saleSuccessRate = this.calculateSaleSuccessRate();
+
+        // Predictive: Trends
+        stats.priceVolatility = this.calculatePriceVolatility();
+        stats.profitAcceleration = this.calculateProfitAcceleration(System.currentTimeMillis() - sessionDurationMs);
+        stats.successRateTrend = this.calculateSuccessRateTrend();
+
+        // Predictive: Projections
+        stats.projectedDailyProfit = this.calculateProjectedDailyProfit(System.currentTimeMillis() - sessionDurationMs);
+        stats.inventoryTurnoverHours = this.calculateInventoryTurnoverHours(currentItemsOnSale);
+
+        // Predictive: Patterns
+        stats.peakEarningHour = this.findPeakEarningHour();
+        stats.bestSnipeHour = this.findBestSnipeHour();
+        stats.priceFloorEstimate = this.estimatePriceFloor();
+        stats.priceCeilingEstimate = this.estimatePriceCeiling();
+
+        // Predictive: Efficiency
+        stats.capitalEfficiency = this.calculateCapitalEfficiency();
+        stats.capitalVelocity = this.calculateCapitalVelocity();
+        stats.consistencyScore = this.calculateConsistencyScore();
 
         // Metadata
         stats.totalSessions = this.totalSessions;

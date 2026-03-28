@@ -41,6 +41,26 @@ public class DetailedStats {
     public double purchaseSuccessRate;
     public double saleSuccessRate;
 
+    // Predictive: Trends
+    public double profitAcceleration; // Change in hourly rate over time
+    public double successRateTrend; // Improvement/decline in success rate
+    public double priceVolatility; // Average deviation from mean price
+
+    // Predictive: Projections
+    public double projectedDailyProfit; // Extrapolated profit if current rate continues
+    public double inventoryTurnoverHours; // Hours until current items likely sold
+
+    // Predictive: Patterns
+    public int peakEarningHour; // Which hour of day has most transactions
+    public int bestSnipeHour; // Which hour has highest success rate
+    public double priceFloorEstimate; // Estimated minimum profitable buy price
+    public double priceCeilingEstimate; // Estimated maximum sale price
+
+    // Predictive: Efficiency
+    public double capitalEfficiency; // Profit per coin invested
+    public double capitalVelocity; // How fast money turns over (sales/spent ratio)
+    public double consistencyScore; // Variance in profits (higher = more consistent)
+
     // Metadata
     public int totalSessions;
     public long generatedAt;

@@ -34,10 +34,10 @@ public class AHSniperStatsScreen extends WindowScreen {
     private void buildUI() {
         // Title
         addMessage("📊 AH Sniper Detailed Statistics");
-        add(theme.horizontalSeparator()).padVertical(theme.scale(4)).expandX();
+        add(this.theme.horizontalSeparator()).padVertical(this.theme.scale(4)).expandX();
 
         // Stats container
-        statsContainer = add(theme.verticalList()).expandX().widget();
+        statsContainer = add(this.theme.verticalList()).expandX().widget();
 
         // Purchase Statistics Section
         addStatsSection("💳 PURCHASE STATISTICS", 
@@ -88,42 +88,73 @@ public class AHSniperStatsScreen extends WindowScreen {
             "Generated: " + java.time.Instant.ofEpochMilli(this.currentStats.generatedAt).toString()
         );
 
-        add(theme.horizontalSeparator()).padVertical(theme.scale(8)).expandX();
+        add(this.theme.horizontalSeparator()).padVertical(this.theme.scale(8)).expandX();
+
+        // Predictive: Trends
+        addStatsSection("📈 TREND ANALYSIS",
+            "Profit Acceleration: " + String.format("%.2f/hr", this.currentStats.profitAcceleration),
+            "Success Rate Trend: " + String.format("%.1f%%", this.currentStats.successRateTrend),
+            "Price Volatility: " + formatPrice(this.currentStats.priceVolatility)
+        );
+
+        // Predictive: Projections
+        addStatsSection("🔮 PROJECTIONS",
+            "Projected Daily: " + formatPrice(this.currentStats.projectedDailyProfit),
+            "Items Clear In: " + String.format("%.1f hours", this.currentStats.inventoryTurnoverHours),
+            "Avg Time To Sell: " + formatMillis((long)this.currentStats.avgTimeToSellMs)
+        );
+
+        // Predictive: Patterns
+        addStatsSection("🎯 PATTERNS & PRICING",
+            "Peak Hour: " + (this.currentStats.peakEarningHour >= 0 ? this.currentStats.peakEarningHour + ":00" : "N/A"),
+            "Best Snipe Hour: " + (this.currentStats.bestSnipeHour >= 0 ? this.currentStats.bestSnipeHour + ":00" : "N/A"),
+            "Price Floor: " + formatPrice(this.currentStats.priceFloorEstimate),
+            "Price Ceiling: " + formatPrice(this.currentStats.priceCeilingEstimate)
+        );
+
+        // Predictive: Efficiency
+        addStatsSection("⚙️ EFFICIENCY METRICS",
+            "Capital Efficiency: " + String.format("%.2f", this.currentStats.capitalEfficiency),
+            "Capital Velocity: " + String.format("%.2f", this.currentStats.capitalVelocity),
+            "Consistency: " + String.format("%.1f%%", this.currentStats.consistencyScore)
+        );
+
+        add(this.theme.horizontalSeparator()).padVertical(this.theme.scale(8)).expandX();
 
         // Button Container
-        WHorizontalList buttonsContainer = add(theme.horizontalList()).expandX().widget();
+        WHorizontalList buttonsContainer = add(this.theme.horizontalList()).expandX().widget();
 
-        WButton sendWebhookButton = buttonsContainer.add(theme.button("📡 Send Webhook")).expandX().widget();
+        WButton sendWebhookButton = buttonsContainer.add(this.theme.button("📡 Send Webhook")).expandX().widget();
         sendWebhookButton.action = () -> {
             this.module.sendDetailedStatsWebhook();
             addNotification("Webhook sent!");
         };
 
-        WButton refreshButton = buttonsContainer.add(theme.button("🔄 Refresh")).expandX().widget();
+        WButton refreshButton = buttonsContainer.add(this.theme.button("🔄 Refresh")).expandX().widget();
         refreshButton.action = this::refresh;
 
-        WButton closeButton = buttonsContainer.add(theme.button("Close")).expandX().widget();
+        WButton closeButton = buttonsContainer.add(this.theme.button("Close")).expandX().widget();
         closeButton.action = this::close;
     }
 
     private void addStatsSection(String title, String... stats) {
         // Title
-        WHorizontalList titleContainer = statsContainer.add(theme.horizontalList()).expandX().widget();
-        titleContainer.add(theme.label(title)).expandX();
+        WHorizontalList titleContainer = statsContainer.add(this.theme.horizontalList()).expandX().widget();
+        titleContainer.add(this.theme.label(title)).expandX();
 
         // Stats
         for (String stat : stats) {
-            WHorizontalList statLine = statsContainer.add(theme.horizontalList()).expandX().widget();
-            statLine.add(theme.label("  " + stat)).expandX();
+            WHorizontalList statLine = statsContainer.add(this.theme.horizontalList()).expandX().widget();
+            statLine.add(this.theme.label("  " + stat)).expandX();
         }
 
         // Separator
-        statsContainer.add(theme.horizontalSeparator()).padVertical(theme.scale(2)).expandX();
+        statsContainer.add(this.theme.horizontalSeparator()).padVertical(this.theme.scale(2)).expandX();
     }
 
     private void addMessage(String message) {
-        WHorizontalList l = add(theme.horizontalList()).expandX().widget();
-        l.add(theme.label(message)).expandX();
+        WHorizontalList l = add(this.theme.horizontalList()).expandX().widget();
+        l.add(this.theme.label(message)).expandX();
     }
 
     private void addNotification(String message) {

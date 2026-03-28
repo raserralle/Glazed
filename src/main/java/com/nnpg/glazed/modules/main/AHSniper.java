@@ -2175,12 +2175,29 @@ private double parseSelfDestructTime(ItemStack stack) {
         
         String inventoryStats = String.format("Current: **%d** | Peak: **%d** | Never Sold: **%d**",
             stats.currentItemsOnSale, stats.peakItemsOnSale, stats.listedButUnsold);
+        
+        // Predictive stats
+        String trendStats = String.format("Profit Accel: **%.2f**/hr | Success Trend: **%.1f%%** | Volatility: **%s**",
+            stats.profitAcceleration, stats.successRateTrend, this.formatPrice(stats.priceVolatility));
+        
+        String projectionStats = String.format("Projected Daily: **%s** | Inventory Clear: **%.1fh** | Avg Flip Time: **%.0f**s",
+            this.formatPrice(stats.projectedDailyProfit), stats.inventoryTurnoverHours, stats.avgTimeToSellMs / 1000.0);
+        
+        String patternStats = String.format("Peak Hour: **%s** | Best Snipe: **%s** | Floor: **%s** | Ceiling: **%s**",
+            stats.peakEarningHour >= 0 ? stats.peakEarningHour + ":00" : "N/A",
+            stats.bestSnipeHour >= 0 ? stats.bestSnipeHour + ":00" : "N/A",
+            this.formatPrice(stats.priceFloorEstimate), this.formatPrice(stats.priceCeilingEstimate));
+        
+        String efficiencyStats = String.format("Capital Efficiency: **%.2f** | Velocity: **%.2f** | Consistency: **%.1f%%**",
+            stats.capitalEfficiency, stats.capitalVelocity, stats.consistencyScore);
 
-        return String.format("{\"content\":\"%s\",\"username\":\"%s\",\"avatar_url\":\"%s\",\"embeds\":[{\"title\":\"Glazed AH Sniper - Comprehensive Statistics\",\"description\":\"Detailed metrics across all-time, daily, and session views\",\"color\":4437377,\"thumbnail\":{\"url\":\"%s\"},\"fields\":[{\"name\":\"💳 Purchase Statistics\",\"value\":\"%s\",\"inline\":false},{\"name\":\"💰 Sales Statistics\",\"value\":\"%s\",\"inline\":false},{\"name\":\"📈 Profit Metrics\",\"value\":\"%s\",\"inline\":false},{\"name\":\"⚡ Performance Metrics\",\"value\":\"%s\",\"inline\":false},{\"name\":\"📦 Inventory Status\",\"value\":\"%s\",\"inline\":false},{\"name\":\"📊 Report Time\",\"value\":\"<t:%d:R>\",\"inline\":true},{\"name\":\"📅 Total Sessions\",\"value\":\"%d\",\"inline\":true}],\"footer\":{\"text\":\"Glazed AH Sniper V2 - Detailed Stats\"},\"timestamp\":\"%s\"}]}",
+        return String.format("{\"content\":\"%s\",\"username\":\"%s\",\"avatar_url\":\"%s\",\"embeds\":[{\"title\":\"Glazed AH Sniper - Comprehensive Statistics\",\"description\":\"Detailed metrics across all-time, daily, and session views\",\"color\":4437377,\"thumbnail\":{\"url\":\"%s\"},\"fields\":[{\"name\":\"💳 Purchase Statistics\",\"value\":\"%s\",\"inline\":false},{\"name\":\"💰 Sales Statistics\",\"value\":\"%s\",\"inline\":false},{\"name\":\"📈 Profit Metrics\",\"value\":\"%s\",\"inline\":false},{\"name\":\"⚡ Performance Metrics\",\"value\":\"%s\",\"inline\":false},{\"name\":\"📦 Inventory Status\",\"value\":\"%s\",\"inline\":false},{\"name\":\"📊 Trend Analysis\",\"value\":\"%s\",\"inline\":false},{\"name\":\"🔮 Projections\",\"value\":\"%s\",\"inline\":false},{\"name\":\"🎯 Patterns & Pricing\",\"value\":\"%s\",\"inline\":false},{\"name\":\"⚙️ Efficiency Metrics\",\"value\":\"%s\",\"inline\":false},{\"name\":\"📊 Report Time\",\"value\":\"<t:%d:R>\",\"inline\":true},{\"name\":\"📅 Total Sessions\",\"value\":\"%d\",\"inline\":true}],\"footer\":{\"text\":\"Glazed AH Sniper V2 - Detailed Stats with Predictions\"},\"timestamp\":\"%s\"}]}",
             this.escapeJson(messageContent), this.escapeJson(webhookUsernameHardcoded), this.escapeJson(webhookAvatarUrlHardcoded),
             this.escapeJson(webhookThumbnailUrlHardcoded),
             this.escapeJson(purchaseStats), this.escapeJson(salesStats), this.escapeJson(profitStats),
             this.escapeJson(performanceStats), this.escapeJson(inventoryStats),
+            this.escapeJson(trendStats), this.escapeJson(projectionStats), this.escapeJson(patternStats),
+            this.escapeJson(efficiencyStats),
             timestamp, stats.totalSessions, Instant.now().toString());
     }
 
