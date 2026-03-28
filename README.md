@@ -1,4 +1,4 @@
-# Glazed BIG BENIS
+# Glazed
 <p align="center">
   <img src="https://nnpg.dev/Glazedlogo.png" alt="Glazed Addon Banner" width="300"/>
 </p>
