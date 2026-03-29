@@ -1490,30 +1490,29 @@ private double parseSelfDestructTime(ItemStack stack) {
     for (int i = 0; i < tooltip.size(); i++) {
         String line = tooltip.get(i).getString().toLowerCase();
 
-        // Detect the header
         if (line.contains("self destruct")) {
-            // Timer is always on the next line
             if (i + 1 >= tooltip.size()) return -1.0;
 
-            String timer = tooltip.get(i + 1).getString().toLowerCase();
-            // Remove Minecraft color codes (§ followed by any characters until whitespace/letter)
+            // Get raw timer line
+            String timer = tooltip.get(i + 1).getString();
+
+            // 1. Remove ALL Minecraft formatting codes (§ followed by any hex digit or formatting code)
             timer = timer.replaceAll("§[0-9a-fklmnor]*", "");
-            // Keep only numbers, decimals, spaces, and time unit letters
-            timer = timer.replaceAll("[^0-9,\\.\\sdhms]", "");
+
+            // 2. Convert to lowercase and remove everything except digits, decimals, spaces, and d/h/m/s
+            timer = timer.toLowerCase().replaceAll("[^0-9,\\.\\sdhms]", "").trim();
 
             double hours = 0.0;
 
-            // Match number (with optional decimal) followed closely by time unit
-            Matcher d = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*d(?:ays?)?").matcher(timer);
+            // 3. Match number (int or decimal) + optional space + unit letter (not followed by other letters)
+            Matcher d = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*d(?![a-z])").matcher(timer);
+            Matcher h = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*h(?![a-z])").matcher(timer);
+            Matcher m = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*m(?![a-z])").matcher(timer);
+            Matcher s = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*s(?![a-z])").matcher(timer);
+
             if (d.find()) hours += Double.parseDouble(d.group(1).replace(",", ".")) * 24.0;
-
-            Matcher h = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*h(?:ours?)?").matcher(timer);
             if (h.find()) hours += Double.parseDouble(h.group(1).replace(",", "."));
-
-            Matcher m = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*m(?:in(?:utes?)?)?").matcher(timer);
             if (m.find()) hours += Double.parseDouble(m.group(1).replace(",", ".")) / 60.0;
-
-            Matcher s = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*s(?:econds?)?").matcher(timer);
             if (s.find()) hours += Double.parseDouble(s.group(1).replace(",", ".")) / 3600.0;
 
             return hours;
