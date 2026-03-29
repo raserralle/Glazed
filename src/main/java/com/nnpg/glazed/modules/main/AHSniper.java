@@ -1499,16 +1499,16 @@ private double parseSelfDestructTime(ItemStack stack) {
 
             double hours = 0.0;
 
-            Matcher d = Pattern.compile("(\\d+)\\s*d").matcher(timer);
+            Matcher d = Pattern.compile("(\\d+)\\s*d(?:ays?)?\\b").matcher(timer);
             if (d.find()) hours += Integer.parseInt(d.group(1)) * 24.0;
 
-            Matcher h = Pattern.compile("(\\d+)\\s*h").matcher(timer);
+            Matcher h = Pattern.compile("(\\d+)\\s*h(?:ours?)?\\b").matcher(timer);
             if (h.find()) hours += Integer.parseInt(h.group(1));
 
-            Matcher m = Pattern.compile("(\\d+)\\s*m(?!in)").matcher(timer);
+            Matcher m = Pattern.compile("(\\d+)\\s*m(?:in(?:utes?)?)?\\b").matcher(timer);
             if (m.find()) hours += Integer.parseInt(m.group(1)) / 60.0;
 
-            Matcher s = Pattern.compile("(\\d+)\\s*s").matcher(timer);
+            Matcher s = Pattern.compile("(\\d+)\\s*s(?:econds?)?\\b").matcher(timer);
             if (s.find()) hours += Integer.parseInt(s.group(1)) / 3600.0;
 
             return hours;
@@ -1524,14 +1524,19 @@ private double parseSelfDestructTime(ItemStack stack) {
         double totalHours = 0.0;
         timeStr = timeStr.toLowerCase();
         boolean foundComponent = false;
-        Matcher days = Pattern.compile("(\\d+)\\s*d").matcher(timeStr);
+        Matcher days = Pattern.compile("(\\d+)\\s*d(?:ays?)?\\b").matcher(timeStr);
         if (days.find()) {
             totalHours += Double.parseDouble(days.group(1)) * 24.0;
             foundComponent = true;
         }
-        Matcher hrs = Pattern.compile("(\\d+)\\s*h").matcher(timeStr);
+        Matcher hrs = Pattern.compile("(\\d+)\\s*h(?:ours?)?\\b").matcher(timeStr);
         if (hrs.find()) {
             totalHours += Double.parseDouble(hrs.group(1));
+            foundComponent = true;
+        }
+        Matcher mins = Pattern.compile("(\\d+)\\s*m(?:in(?:utes?)?)?\\b").matcher(timeStr);
+        if (mins.find()) {
+            totalHours += Double.parseDouble(mins.group(1)) / 60.0;
             foundComponent = true;
         }
         return foundComponent ? totalHours : -1.0;
