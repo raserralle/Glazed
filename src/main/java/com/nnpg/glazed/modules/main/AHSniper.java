@@ -1222,6 +1222,7 @@ public class AHSniper extends Module {
                 if (this.notifications.get()) {
                     this.info("CANCELLED: Could not find item in confirmation GUI");
                 }
+                this.clickCancelButton(handler);
                 this.purchaseAttempted = false;
                 this.hasClickedBuy = false;
                 this.waitingForConfirmation = false;
@@ -1233,6 +1234,7 @@ public class AHSniper extends Module {
                 if (this.notifications.get()) {
                     this.info("CANCELLED: Item timer is %.1f hours, below minimum %.1f hours", confirmationTimer, this.minTimeHours.get());
                 }
+                this.clickCancelButton(handler);
                 this.purchaseAttempted = false;
                 this.hasClickedBuy = false;
                 this.waitingForConfirmation = false;
@@ -1291,6 +1293,29 @@ public class AHSniper extends Module {
             item == Items.GREEN_CONCRETE || item == Items.GREEN_CONCRETE_POWDER ||
             item == Items.LIME_STAINED_GLASS || item == Items.EMERALD ||
             item == Items.LIME_TERRACOTTA || item == Items.LIME_STAINED_GLASS_PANE;
+    }
+
+    private boolean clickCancelButton(GenericContainerScreenHandler handler) {
+        for (int i = 0; i < handler.slots.size(); ++i) {
+            ItemStack stack = handler.getSlot(i).getStack();
+            if (this.isCancelButton(stack)) {
+                this.mc.interactionManager.clickSlot(handler.syncId, i, 0, SlotActionType.PICKUP, this.mc.player);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isCancelButton(ItemStack stack) {
+        if (stack.isEmpty()) return false;
+        String name = stack.getName().getString().toLowerCase();
+        if (name.contains("cancel") || name.contains("no") || name.contains("decline") || name.contains("reject")) {
+            return true;
+        }
+        Item item = stack.getItem();
+        return item == Items.RED_STAINED_GLASS || item == Items.RED_WOOL || item == Items.RED_DYE ||
+            item == Items.RED_CONCRETE || item == Items.RED_CONCRETE_POWDER ||
+            item == Items.RED_TERRACOTTA || item == Items.RED_STAINED_GLASS_PANE;
     }
 
     private void openAuctionHouse() {
