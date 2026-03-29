@@ -1498,8 +1498,8 @@ private double parseSelfDestructTime(ItemStack stack) {
             String timer = tooltip.get(i + 1).getString().toLowerCase();
             // Remove Minecraft color codes (§ followed by any characters until whitespace/letter)
             timer = timer.replaceAll("§[0-9a-fklmnor]*", "");
-            // Remove everything after the first non-time character sequence
-            timer = timer.replaceAll("[^0-9,\\.\\s].*$", "").trim();
+            // Keep only numbers, decimals, spaces, and time unit letters
+            timer = timer.replaceAll("[^0-9,\\.\\sdhms]", "");
 
             double hours = 0.0;
 
@@ -1530,8 +1530,8 @@ private double parseSelfDestructTime(ItemStack stack) {
         timeStr = timeStr.toLowerCase();
         // Remove Minecraft color codes (§ followed by any characters until whitespace/letter)
         timeStr = timeStr.replaceAll("§[0-9a-fklmnor]*", "");
-        // Remove everything after the first non-time character sequence
-        timeStr = timeStr.replaceAll("[^0-9,\\.\\s].*$", "").trim();
+        // Keep only numbers, decimals, spaces, and time unit letters
+        timeStr = timeStr.replaceAll("[^0-9,\\.\\sdhms]", "");
         boolean foundComponent = false;
         Matcher days = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*d(?:ays?)?").matcher(timeStr);
         if (days.find()) {
