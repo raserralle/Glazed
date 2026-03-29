@@ -1498,20 +1498,23 @@ private double parseSelfDestructTime(ItemStack stack) {
             String timer = tooltip.get(i + 1).getString().toLowerCase();
             // Remove Minecraft color codes (§ followed by any characters until whitespace/letter)
             timer = timer.replaceAll("§[0-9a-fklmnor]*", "");
+            // Remove everything after the first non-time character sequence
+            timer = timer.replaceAll("[^0-9,\\.\\s].*$", "").trim();
 
             double hours = 0.0;
 
-            Matcher d = Pattern.compile("(\\d+)\\s*d(?:ays?)?\\b").matcher(timer);
-            if (d.find()) hours += Integer.parseInt(d.group(1)) * 24.0;
+            // Match number (with optional decimal) followed closely by time unit
+            Matcher d = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*d(?:ays?)?").matcher(timer);
+            if (d.find()) hours += Double.parseDouble(d.group(1).replace(",", ".")) * 24.0;
 
-            Matcher h = Pattern.compile("(\\d+)\\s*h(?:ours?)?\\b").matcher(timer);
-            if (h.find()) hours += Integer.parseInt(h.group(1));
+            Matcher h = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*h(?:ours?)?").matcher(timer);
+            if (h.find()) hours += Double.parseDouble(h.group(1).replace(",", "."));
 
-            Matcher m = Pattern.compile("(\\d+)\\s*m(?:in(?:utes?)?)?\\b").matcher(timer);
-            if (m.find()) hours += Integer.parseInt(m.group(1)) / 60.0;
+            Matcher m = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*m(?:in(?:utes?)?)?").matcher(timer);
+            if (m.find()) hours += Double.parseDouble(m.group(1).replace(",", ".")) / 60.0;
 
-            Matcher s = Pattern.compile("(\\d+)\\s*s(?:econds?)?\\b").matcher(timer);
-            if (s.find()) hours += Integer.parseInt(s.group(1)) / 3600.0;
+            Matcher s = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*s(?:econds?)?").matcher(timer);
+            if (s.find()) hours += Double.parseDouble(s.group(1).replace(",", ".")) / 3600.0;
 
             return hours;
         }
@@ -1527,20 +1530,22 @@ private double parseSelfDestructTime(ItemStack stack) {
         timeStr = timeStr.toLowerCase();
         // Remove Minecraft color codes (§ followed by any characters until whitespace/letter)
         timeStr = timeStr.replaceAll("§[0-9a-fklmnor]*", "");
+        // Remove everything after the first non-time character sequence
+        timeStr = timeStr.replaceAll("[^0-9,\\.\\s].*$", "").trim();
         boolean foundComponent = false;
-        Matcher days = Pattern.compile("(\\d+)\\s*d(?:ays?)?\\b").matcher(timeStr);
+        Matcher days = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*d(?:ays?)?").matcher(timeStr);
         if (days.find()) {
-            totalHours += Double.parseDouble(days.group(1)) * 24.0;
+            totalHours += Double.parseDouble(days.group(1).replace(",", ".")) * 24.0;
             foundComponent = true;
         }
-        Matcher hrs = Pattern.compile("(\\d+)\\s*h(?:ours?)?\\b").matcher(timeStr);
+        Matcher hrs = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*h(?:ours?)?").matcher(timeStr);
         if (hrs.find()) {
-            totalHours += Double.parseDouble(hrs.group(1));
+            totalHours += Double.parseDouble(hrs.group(1).replace(",", "."));
             foundComponent = true;
         }
-        Matcher mins = Pattern.compile("(\\d+)\\s*m(?:in(?:utes?)?)?\\b").matcher(timeStr);
+        Matcher mins = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*m(?:in(?:utes?)?)?").matcher(timeStr);
         if (mins.find()) {
-            totalHours += Double.parseDouble(mins.group(1)) / 60.0;
+            totalHours += Double.parseDouble(mins.group(1).replace(",", ".")) / 60.0;
             foundComponent = true;
         }
         return foundComponent ? totalHours : -1.0;
