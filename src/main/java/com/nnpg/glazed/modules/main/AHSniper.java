@@ -1151,12 +1151,9 @@ public class AHSniper extends Module {
             double timeLeft = this.parseSelfDestructTime(stack);
             String itemName = stack.getItem().getName().getString();
             if (timeLeft != -1.0 && timeLeft < this.minTimeHours.get()) {
-                DebugLogger.logTimerCheck(itemName, timeLeft, this.minTimeHours.get(), false);
                 return false;
             }
-            if (timeLeft != -1.0) {
-                DebugLogger.logTimerCheck(itemName, timeLeft, this.minTimeHours.get(), true);
-            }
+            // Timer check passed
         }
         if (!config.enchantments.isEmpty() && !this.hasValidEnchantmentsForConfig(stack, config)) return false;
 
@@ -1667,14 +1664,12 @@ private double parseSelfDestructTime(ItemStack stack) {
             // Log to file
             String itemName = stack.getItem().getName().getString();
             if (timeLeft == -1.0) {
-                DebugLogger.logTimerCheck(itemName, timeLeft, this.minTimeHours.get(), false);
                 if (this.debugMode.get()) {
                     this.info("Debug: Item rejected - no timer found (required: %.2f hours)", this.minTimeHours.get());
                 }
                 return false;
             }
             if (timeLeft < this.minTimeHours.get()) {
-                DebugLogger.logTimerCheck(itemName, timeLeft, this.minTimeHours.get(), false);
                 if (this.debugMode.get()) {
                     this.info("Debug: Item rejected - timer too low (%.2f < %.2f)", timeLeft, this.minTimeHours.get());
                 }
