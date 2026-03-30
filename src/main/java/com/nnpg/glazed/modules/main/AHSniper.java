@@ -858,8 +858,12 @@ public class AHSniper extends Module {
         this.inventoryCheckTicks = 0;
         this.sellingDelayCounter = 0;
         this.lastActionTicks = 0;
+        this.attemptedItemName = "";
+        this.attemptedActualPrice = 0.0;
+        this.attemptedQuantity = 0;
         this.attemptedEnchantments = "";
         this.attemptedDestructionHours = 0.0;
+        this.attemptedDestructionTimer = "";
         this.currentSnipedItem = null;
         this.lastClickedSlot = -1;
         if (this.debugMode.get()) {
