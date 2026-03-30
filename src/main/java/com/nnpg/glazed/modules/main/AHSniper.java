@@ -1237,6 +1237,11 @@ public class AHSniper extends Module {
         }
         if (this.hasClickedConfirm) return;
 
+        // If we're waiting for delay to elapse, skip processing
+        if (this.waitingToConfirm && this.confirmDelayCounter > 0) {
+            return;
+        }
+
         // Only verify destruction timer during purchase, not during auto-sell (which happens after item is picked up)
         if (this.filterLowTime.get() && !this.itemPickedUp && handler.slots.size() > 13) {
             double confirmationTimer = this.readDestructionTimerFromScreen(handler);
@@ -1251,6 +1256,7 @@ public class AHSniper extends Module {
                 this.purchaseAttempted = false;
                 this.hasClickedBuy = false;
                 this.waitingForConfirmation = false;
+                this.waitingToConfirm = false;
                 return;
             }
             
@@ -1264,6 +1270,7 @@ public class AHSniper extends Module {
                 this.purchaseAttempted = false;
                 this.hasClickedBuy = false;
                 this.waitingForConfirmation = false;
+                this.waitingToConfirm = false;
                 return;
             }
             
@@ -1271,6 +1278,14 @@ public class AHSniper extends Module {
             DebugLogger.logPurchaseConfirmed(confirmationTimer, this.minTimeHours.get());
         }
 
+        // If not already waiting for delay, start the delay timer
+        if (!this.waitingToConfirm) {
+            this.waitingToConfirm = true;
+            this.confirmDelayCounter = 2;
+            return;
+        }
+
+        // Delay has elapsed, now click confirm
         if (this.clickConfirmButton(handler)) {
             this.lastActionTicks = 0;
             this.hasClickedConfirm = true;
