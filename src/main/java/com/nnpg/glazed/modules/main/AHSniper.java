@@ -1334,6 +1334,7 @@ public class AHSniper extends Module {
         for (int i = 0; i < handler.slots.size(); ++i) {
             ItemStack stack = handler.getSlot(i).getStack();
             if (this.isCancelButton(stack)) {
+                DebugLogger.log("DECLINE BUTTON CLICKED - Slot: " + i + " | Item: " + stack.getName().getString());
                 this.mc.interactionManager.clickSlot(handler.syncId, i, 0, SlotActionType.PICKUP, this.mc.player);
                 return true;
             }
@@ -1670,7 +1671,7 @@ private double parseSelfDestructTime(ItemStack stack) {
                 return false;
             }
             // Timer passed
-            DebugLogger.logTimerCheck(itemName, timeLeft, this.minTimeHours.get(), true);
+            // DebugLogger.logTimerCheck(itemName, timeLeft, this.minTimeHours.get(), true);
         }
 
         if (this.enchantmentMode.get() && !this.requiredEnchantments.get().isEmpty() && !this.hasValidEnchantments(stack)) {
