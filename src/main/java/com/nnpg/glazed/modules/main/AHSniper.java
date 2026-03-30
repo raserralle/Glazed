@@ -2,6 +2,7 @@ package com.nnpg.glazed.modules.main;
 
 import com.nnpg.glazed.GlazedAddon;
 import com.nnpg.glazed.utils.Statistics;
+import com.nnpg.glazed.utils.DebugLogger;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -769,6 +770,10 @@ public class AHSniper extends Module {
         this.previousItemCount = this.countItemInInventory();
         this.sessionStartTime = System.currentTimeMillis();
 
+        // Log debug info
+        DebugLogger.logSessionStart();
+        DebugLogger.logFilterSettings(this.filterLowTime.get(), this.minTimeHours.get());
+
         // Load timer conditions if enabled
         if (this.timerConditionsEnabled.get() && this.autoSell.get()) {
             this.timerConditions.clear();
@@ -815,6 +820,9 @@ public class AHSniper extends Module {
         this.resetState();
         this.multiSnipeConfigs.clear();
         this.timerConditions.clear();
+        
+        // Log session end
+        DebugLogger.logSessionEnd();
         
         // Show final profit summary on deactivate
         if ((this.stats.allTimeSold > 0 || this.stats.allTimeSpent > 0) && this.notifications.get()) {
@@ -1089,6 +1097,11 @@ public class AHSniper extends Module {
                                 double destructionHours = this.parseSelfDestructTime(stack);
                                 this.attemptedDestructionHours = destructionHours;
                                 this.attemptedDestructionTimer = this.formatDestructionTimer(destructionHours);
+                                
+                                // Log purchase attempt
+                                DebugLogger.logPurchaseAttempt(this.attemptedItemName, this.attemptedQuantity, 
+                                    currentItemPrice, destructionHours, this.attemptedDestructionTimer);
+                                
                                 this.mc.interactionManager.clickSlot(handler.syncId, i, 1, SlotActionType.QUICK_MOVE, this.mc.player);
                                 this.isProcessing = false;
                                 this.hasClickedBuy = true;
@@ -1132,7 +1145,14 @@ public class AHSniper extends Module {
         if (this.hasCursedEnchantments(stack)) return false;
         if (this.filterLowTime.get()) {
             double timeLeft = this.parseSelfDestructTime(stack);
-            if (timeLeft != -1.0 && timeLeft < this.minTimeHours.get()) return false;
+            String itemName = stack.getItem().getName().getString();
+            if (timeLeft != -1.0 && timeLeft < this.minTimeHours.get()) {
+                DebugLogger.logTimerCheck(itemName, timeLeft, this.minTimeHours.get(), false);
+                return false;
+            }
+            if (timeLeft != -1.0) {
+                DebugLogger.logTimerCheck(itemName, timeLeft, this.minTimeHours.get(), true);
+            }
         }
         if (!config.enchantments.isEmpty() && !this.hasValidEnchantmentsForConfig(stack, config)) return false;
 
@@ -1219,6 +1239,7 @@ public class AHSniper extends Module {
             
             if (confirmationTimer == -1.0) {
                 // No item found in confirmation slot - cancel purchase
+                DebugLogger.logPurchaseCancelled("No item found in confirmation GUI", confirmationTimer, this.minTimeHours.get());
                 if (this.notifications.get()) {
                     this.info("CANCELLED: Could not find item in confirmation GUI");
                 }
@@ -1231,6 +1252,7 @@ public class AHSniper extends Module {
             
             if (confirmationTimer < this.minTimeHours.get()) {
                 // Timer is below minimum requirement - cancel purchase
+                DebugLogger.logPurchaseCancelled("Timer below minimum", confirmationTimer, this.minTimeHours.get());
                 if (this.notifications.get()) {
                     this.info("CANCELLED: Item timer is %.1f hours, below minimum %.1f hours", confirmationTimer, this.minTimeHours.get());
                 }
@@ -1240,6 +1262,9 @@ public class AHSniper extends Module {
                 this.waitingForConfirmation = false;
                 return;
             }
+            
+            // Timer passed confirmation check
+            DebugLogger.logPurchaseConfirmed(confirmationTimer, this.minTimeHours.get());
         }
 
         if (this.clickConfirmButton(handler)) {
@@ -1376,6 +1401,11 @@ public class AHSniper extends Module {
                         double destructionHours = this.parseSelfDestructTime(stack);
                         this.attemptedDestructionHours = destructionHours;
                         this.attemptedDestructionTimer = this.formatDestructionTimer(destructionHours);
+                        
+                        // Log purchase attempt
+                        DebugLogger.logPurchaseAttempt(this.attemptedItemName, this.attemptedQuantity, 
+                            currentItemPrice, destructionHours, this.attemptedDestructionTimer);
+                        
                         this.mc.interactionManager.clickSlot(handler.syncId, i, 1, SlotActionType.QUICK_MOVE, this.mc.player);
                         this.isProcessing = false;
                         this.hasClickedBuy = true;
@@ -1436,6 +1466,11 @@ public class AHSniper extends Module {
                 double destructionHours = this.parseSelfDestructTime(auctionItem);
                 this.attemptedDestructionHours = destructionHours;
                 this.attemptedDestructionTimer = this.formatDestructionTimer(destructionHours);
+                
+                // Log purchase attempt
+                DebugLogger.logPurchaseAttempt(this.attemptedItemName, this.attemptedQuantity, 
+                    currentItemPrice, destructionHours, this.attemptedDestructionTimer);
+                
                 this.mc.interactionManager.clickSlot(handler.syncId, 15, 1, SlotActionType.QUICK_MOVE, this.mc.player);
                 this.hasClickedBuy = true;
                 this.purchaseAttempted = true;
@@ -1610,18 +1645,24 @@ private double parseSelfDestructTime(ItemStack stack) {
                     this.info("Debug: No destruction timer found for item");
                 }
             }
+            // Log to file
+            String itemName = stack.getItem().getName().getString();
             if (timeLeft == -1.0) {
+                DebugLogger.logTimerCheck(itemName, timeLeft, this.minTimeHours.get(), false);
                 if (this.debugMode.get()) {
                     this.info("Debug: Item rejected - no timer found (required: %.2f hours)", this.minTimeHours.get());
                 }
                 return false;
             }
             if (timeLeft < this.minTimeHours.get()) {
+                DebugLogger.logTimerCheck(itemName, timeLeft, this.minTimeHours.get(), false);
                 if (this.debugMode.get()) {
                     this.info("Debug: Item rejected - timer too low (%.2f < %.2f)", timeLeft, this.minTimeHours.get());
                 }
                 return false;
             }
+            // Timer passed
+            DebugLogger.logTimerCheck(itemName, timeLeft, this.minTimeHours.get(), true);
         }
 
         if (this.enchantmentMode.get() && !this.requiredEnchantments.get().isEmpty() && !this.hasValidEnchantments(stack)) {
