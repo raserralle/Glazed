@@ -1250,10 +1250,7 @@ public class AHSniper extends Module {
                     this.info("CANCELLED: Could not find item in confirmation GUI");
                 }
                 this.clickCancelButton(handler);
-                this.purchaseAttempted = false;
-                this.hasClickedBuy = false;
-                this.waitingForConfirmation = false;
-                this.waitingToConfirm = false;
+                this.resetState();
                 return;
             }
             
@@ -1264,10 +1261,7 @@ public class AHSniper extends Module {
                     this.info("CANCELLED: Item timer is %.1f hours, below minimum %.1f hours", confirmationTimer, this.minTimeHours.get());
                 }
                 this.clickCancelButton(handler);
-                this.purchaseAttempted = false;
-                this.hasClickedBuy = false;
-                this.waitingForConfirmation = false;
-                this.waitingToConfirm = false;
+                this.resetState();
                 return;
             }
             
