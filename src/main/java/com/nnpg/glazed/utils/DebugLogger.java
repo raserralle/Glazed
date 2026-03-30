@@ -125,6 +125,22 @@ public class DebugLogger {
     }
     
     /**
+     * Logs a webhook-related debug message
+     * @param message The debug message to log
+     */
+    public static void logWebhookDebug(String message) {
+        log("[WEBHOOK DEBUG] " + message);
+    }
+    
+    /**
+     * Logs a webhook-related error message
+     * @param message The error message to log
+     */
+    public static void logWebhookError(String message) {
+        log("[WEBHOOK ERROR] " + message);
+    }
+    
+    /**
      * Gets the debug log file path
      */
     public static File getLogFile() {
