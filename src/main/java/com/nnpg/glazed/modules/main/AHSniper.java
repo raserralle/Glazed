@@ -1093,6 +1093,12 @@ public class AHSniper extends Module {
                             }
 
                             if (this.isProcessing) {
+                                // RE-VALIDATE item in case auction refreshed between ticks
+                                if (!this.isValidMultiSnipeItem(stack, config)) {
+                                    this.isProcessing = false;
+                                    continue;
+                                }
+                                
                                 this.currentSnipedItem = config.item;
                                 this.attemptedItemName = stack.getItem().getName().getString();
                                 this.attemptedActualPrice = currentItemPrice;
@@ -1404,6 +1410,12 @@ public class AHSniper extends Module {
                     }
 
                     if (this.isProcessing) {
+                        // RE-VALIDATE item in case auction refreshed between ticks
+                        if (!this.isValidAuctionItem(stack)) {
+                            this.isProcessing = false;
+                            continue;
+                        }
+                        
                         this.currentSnipedItem = this.snipingItem.get();
                         this.attemptedItemName = this.snipingItem.get().getName().getString();
                         this.attemptedActualPrice = currentItemPrice;
@@ -1656,8 +1668,6 @@ private double parseSelfDestructTime(ItemStack stack) {
                     this.info("Debug: No destruction timer found for item");
                 }
             }
-            // Log to file
-            String itemName = stack.getItem().getName().getString();
             if (timeLeft == -1.0) {
                 if (this.debugMode.get()) {
                     this.info("Debug: Item rejected - no timer found (required: %.2f hours)", this.minTimeHours.get());
@@ -1670,8 +1680,6 @@ private double parseSelfDestructTime(ItemStack stack) {
                 }
                 return false;
             }
-            // Timer passed
-            // DebugLogger.logTimerCheck(itemName, timeLeft, this.minTimeHours.get(), true);
         }
 
         if (this.enchantmentMode.get() && !this.requiredEnchantments.get().isEmpty() && !this.hasValidEnchantments(stack)) {
